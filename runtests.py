@@ -1,0 +1,55 @@
+import sys
+
+from django.conf import settings
+from django import VERSION
+
+
+settings.configure(
+    DEBUG=True,
+    DATABASES={
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+        }
+    },
+    INSTALLED_APPS=(
+        'django.contrib.auth',
+        'django.contrib.contenttypes',
+        'django.contrib.sessions',
+        'django.contrib.admin',
+        'inelastic_models',
+    ),
+    MIGRATION_MODULES={
+        'inelastic_models': 'inelastic_models.test_migrations'
+    },
+    MIDDLEWARE_CLASSES=[],
+    ELASTICSEARCH_CONNECTIONS={
+        'default': {
+            'HOSTS': ['http://localhost:9200'],
+            'INDEX_NAME': 'inelastic_models',
+        }
+    },
+    TEMPLATES=[{
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'OPTIONS': {
+            'loaders': [
+                ('django.template.loaders.locmem.Loader', {
+                    'test_index_template_name.txt': 'Template_{{ object.name }}',
+                }),
+            ],
+        },
+    }]
+)
+
+if VERSION[:2] >= (1, 7):
+    from django import setup
+else:
+    setup = lambda: None
+
+setup()
+
+
+from inelastic_models.tests import SearchTestRunner
+test_runner = SearchTestRunner(verbosity=1)
+failures = test_runner.run_tests(['inelastic_models.tests'])
+if failures:
+    sys.exit(failures)

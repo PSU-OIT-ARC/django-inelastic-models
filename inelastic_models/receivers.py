@@ -1,0 +1,113 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
+import threading
+import logging
+import six
+
+from contextlib import contextmanager
+from datetime import timedelta
+
+from django.utils.lru_cache import lru_cache
+from django.utils.timezone import now
+from django.core.cache import caches
+from django.dispatch import receiver
+from django.db.models import signals
+from django.apps import apps
+
+from .models import SearchMixin, merge
+
+SUSPENSION_BUFFER_TIME = timedelta(seconds=10)
+logger = logging.getLogger(__name__)
+suspended_models = []
+
+
+@lru_cache()
+def get_search_models():
+    """
+    TBD
+    """
+    return [m for m in apps.get_models()
+            if issubclass(m, SearchMixin) and 'Search' in m.__dict__]
+
+def _is_suspended(model):
+    global suspended_models
+
+    for models in suspended_models:
+        if model in models:
+            return True
+
+    return False
+
+def get_dependents(instance):
+    dependents = {}
+    for model in get_search_models():
+        search_meta = model._search_meta()
+        dependencies = search_meta.get_dependencies()
+        if type(instance) in dependencies:
+            filter_kwargs = {dependencies[type(instance)]: instance}
+            qs = search_meta.model.objects.filter(**filter_kwargs)
+            dependents[model] = qs
+
+    return dependents
+
+@receiver(signals.pre_save)
+@receiver(signals.pre_delete)
+def collect_dependents(sender, **kwargs):
+    instance = kwargs['instance']
+    instance._search_dependents = get_dependents(instance)
+
+@receiver(signals.post_delete)
+@receiver(signals.post_save)
+def update_search_index(sender, **kwargs):
+    search_models = get_search_models()
+    instance = kwargs['instance']
+
+    if not isinstance(instance, sender):
+        sender = type(instance)
+    if sender not in search_models or _is_suspended(sender):
+        logger.debug("Skipping indexing for '%s'" % (sender))
+        return
+
+    instance.index()
+
+    dependents = merge([instance._search_dependents, get_dependents(instance)])
+    for model, qs in six.iteritems(dependents):
+        search_meta = model._search_meta()
+        for record in qs.iterator():
+            search_meta.index_instance(record)
+
+@receiver(signals.m2m_changed)
+def handle_m2m(sender, **kwargs):
+    if kwargs['action'].startswith("pre_"):
+        collect_dependents(kwargs['model'], **kwargs)
+    else:
+        update_search_index(kwargs['model'], **kwargs)
+
+@contextmanager
+def suspended_updates(models=None, permanent=False):
+    global suspended_models
+    
+    try:
+        search_models = get_search_models()
+        if models is None:
+            models = search_models
+        models = set(models)
+
+        start = now() - SUSPENSION_BUFFER_TIME
+        suspended_models.append(models)
+
+        yield
+
+    finally:
+        suspended_models.remove(models)
+
+        if permanent is True:
+            return
+        
+        search_models = get_search_models()
+        for model in search_models:
+            search_meta = model._search_meta()
+            if model in models or models.intersection(search_meta.dependencies):
+                qs = search_meta.get_qs(since=start)
+                search_meta.index_qs(qs)
