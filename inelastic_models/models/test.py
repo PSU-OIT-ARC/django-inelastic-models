@@ -6,7 +6,7 @@ import six
 from django.utils.encoding import python_2_unicode_compatible
 from django.db import models
 
-from .base import (SearchMixin,
+from .base import (SearchMixin, Search,
                    NGramField, ListField, ObjectField, MultiObjectField)
 
 TEST_MODEL_EXCLUDE_NAME = 'NO'
@@ -30,18 +30,19 @@ class Model(SearchMixin, models.Model):
     def __str__(self):
         return self.name
 
-    class Search(SearchMixin.Search):
-        attribute_fields = ['date', 'email', 'count_m2m']
-        other_fields = {
-            'name': NGramField('name'),
-        }
-
-        def get_base_qs(self):
-            return self.model.objects.exclude(
-                name=TEST_MODEL_EXCLUDE_NAME)
-
     class Meta:
         app_label = 'inelastic_models'
+
+class ModelSearch(Search):
+    attribute_fields = ['date', 'email', 'count_m2m']
+    other_fields = {
+        'name': NGramField('name'),
+    }
+
+    def get_base_qs(self):
+        return self.model.objects.exclude(name=TEST_MODEL_EXCLUDE_NAME)
+
+ModelSearch.bind_to_model(Model)
 
 @python_2_unicode_compatible
 class SearchFieldModel(SearchMixin, models.Model):
@@ -51,14 +52,16 @@ class SearchFieldModel(SearchMixin, models.Model):
     def __str__(self):
         return six.text_type("Related: %s" % (self.related))
 
-    class Search(SearchMixin.Search):
-        other_fields = {
-            'model_list': ListField('models'),
-            'related': ObjectField(
-                'related', attribute_fields=['name', 'modified_on']),
-            'model_objects': MultiObjectField(
-                'model_set', attribute_fields=['name','modified_on']),
-        }
-
     class Meta:
         app_label = 'inelastic_models'
+
+class SearchFieldModelSearch(Search):
+    other_fields = {
+        'model_list': ListField('models'),
+        'related': ObjectField(
+            'related', attribute_fields=['name', 'modified_on']),
+        'model_objects': MultiObjectField(
+            'model_set', attribute_fields=['name','modified_on']),
+    }
+
+SearchFieldModelSearch.bind_to_model(SearchFieldModel)

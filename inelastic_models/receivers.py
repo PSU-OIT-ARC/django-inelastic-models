@@ -24,11 +24,7 @@ suspended_models = []
 
 @lru_cache()
 def get_search_models():
-    """
-    TBD
-    """
-    return [m for m in apps.get_models()
-            if issubclass(m, SearchMixin) and 'Search' in m.__dict__]
+    return [m for m in apps.get_models() if issubclass(m, SearchMixin)]
 
 def _is_suspended(model):
     global suspended_models
