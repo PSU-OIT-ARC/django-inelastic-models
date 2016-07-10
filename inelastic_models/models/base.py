@@ -124,7 +124,7 @@ class AttributeField(SearchField):
                 instance = getattr(instance, attr)
             except AttributeError as exc:
                 msg = "'{0}' not defined on {1}: {2!s}"
-                logger.warning(msg.format(self.path, instance, e))
+                logger.warning(msg.format(self.path, instance, exc))
 
         return instance
 
