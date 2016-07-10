@@ -12,6 +12,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch import exceptions
 import elasticsearch_dsl as dsl
 
+from django.utils.functional import cached_property
 from django.template.loader import render_to_string
 from django.core.exceptions import FieldDoesNotExist
 from django.db.models.fields.related import ForeignObjectRel
@@ -379,7 +380,9 @@ class Search(FieldMappingMixin):
         return mapping
 
     def get_index(self):
-        return settings.ELASTICSEARCH_CONNECTIONS[self.connection]['INDEX_NAME']
+        return '{}--{}'.format(
+            settings.ELASTICSEARCH_CONNECTIONS[self.connection]['INDEX_NAME'],
+            self.get_doc_type())
 
     def get_doc_type(self):
         if self.doc_type is not None:

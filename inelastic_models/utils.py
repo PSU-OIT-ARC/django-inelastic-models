@@ -11,6 +11,9 @@ from django.core.paginator import Paginator, Page
 from django.conf import settings
 from django.apps import apps
 
+from inelastic_models.receivers import get_search_models
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,9 +49,11 @@ def refresh_search_indexes():
     for name, connection in list(settings.ELASTICSEARCH_CONNECTIONS.items()):
         try:
             es = Elasticsearch(connection['HOSTS'])
-            logger.debug("Refreshing index '{}'".format(connection['INDEX_NAME']))
-            es.indices.refresh(index=connection['INDEX_NAME'])
-            es.indices.flush(wait_if_ongoing=True)
+            for model in get_search_models():
+                index = model._search_meta().get_index()
+                logger.debug("Refreshing index '{}'".format(index))
+                es.indices.refresh(index=index)
+                es.indices.flush(wait_if_ongoing=True)
         except Exception as exc:
             logger.error("Error in 'refresh_search_indexes': {0!s}".format(exc))
 
@@ -56,9 +61,11 @@ def clear_search_indexes():
     for name, connection in list(settings.ELASTICSEARCH_CONNECTIONS.items()):
         try:
             es = Elasticsearch(connection['HOSTS'])
-            logger.debug("Clearing index '{}'".format(connection['INDEX_NAME']))
-            es.indices.delete(index=connection['INDEX_NAME'])
-            es.indices.create(index=connection['INDEX_NAME'])
-            es.indices.flush(wait_if_ongoing=True)
+            for model in get_search_models():
+                index = model._search_meta().get_index()
+                logger.debug("Clearing index '{}'".format(index))
+                es.indices.delete(index=index)
+                es.indices.create(index=index)
+                es.indices.flush(wait_if_ongoing=True)
         except Exception as exc:
             logger.error("Error in 'clear_search_indexes': {0!s}".format(exc))
