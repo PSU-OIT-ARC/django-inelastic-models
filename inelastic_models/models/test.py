@@ -34,9 +34,9 @@ class Model(SearchMixin, models.Model):
         app_label = 'inelastic_models'
 
 class ModelSearch(Search):
-    attribute_fields = ['date', 'email', 'count_m2m']
+    attribute_fields = ['name', 'date', 'email', 'count_m2m']
     other_fields = {
-        'name': NGramField('name'),
+        'test_ngram': NGramField('name'),
     }
 
     def get_base_qs(self):
