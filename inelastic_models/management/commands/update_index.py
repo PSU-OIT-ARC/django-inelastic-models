@@ -12,4 +12,4 @@ class Command(IndexCommand):
         print("Indexing %d %s objects" % (
             queryset.count(), search.model.__name__))
         search.index_qs(queryset)
-        search.bulk_delete()
+        search.bulk_prune()

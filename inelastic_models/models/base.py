@@ -423,23 +423,15 @@ class Search(FieldMappingMixin):
         index = self.get_index()
         es = self.get_es()
 
-        if not es.indices.exists(index):
-            logger.debug("Creating index '%s'" % (index))
-            es.indices.create(index)
-            es.indices.refresh(index=index)
-            es.cluster.health(wait_for_status='yellow')
-            es.indices.flush(wait_if_ongoing=True)
-            return True
+        if es.indices.exists(index):
+            logger.warning("Deleting index '{}'".format(index))
+            es.indices.delete(index)
 
-        try:
-            logger.debug("Removing mapping for index '%s' and doc type '%s'" % (index, doc_type))
-            es.indices.delete_mapping(index, doc_type)
-            es.indices.refresh(index=index)
-            es.indices.flush(wait_if_ongoing=True)
-        except (exceptions.NotFoundError, exceptions.AuthorizationException):
-            logger.debug("Mapping doesn't exist for index '%s'" % (index))
-        finally:
-            return False
+        logger.debug("Creating index '%s'" % (index))
+        es.indices.create(index)
+        es.indices.refresh(index=index)
+        es.cluster.health(wait_for_status='yellow')
+        es.indices.flush(wait_if_ongoing=True)
 
     def configure_index(self):
         """
@@ -497,38 +489,6 @@ class Search(FieldMappingMixin):
         logger.debug("Updating mapping for index '%s' and doc type '%s': %s" % (index, doc_type, mapping))
         es.indices.put_mapping(doc_type, mapping, index=index)
 
-    def index_instance(self, instance):
-        if self.get_qs().filter(pk=instance.pk).exists():
-            self.get_es().index(
-                index=self.get_index(),
-                doc_type=self.get_doc_type(),
-                id=instance.pk,
-                body=self.prepare(instance))
-        else:
-            logger.debug("Un-indexing instance (DB says it it not to be indexed).")
-            self.get_es().delete(
-                index=self.get_index(),
-                doc_type=self.get_doc_type(),
-                id=instance.pk,
-                ignore=404)
-
-    def index_qs(self, qs):
-        doc_type = self.get_doc_type()
-        index = self.get_index()
-
-        actions = [{'_index': index,
-                    '_type': doc_type,
-                    '_id': instance.pk,
-                    '_source': self.prepare(instance)}
-                   for instance in qs.iterator()]
-
-        try:
-            response = bulk(client=self.get_es(), actions=tuple(actions))
-            self.get_es().indices.refresh(index=index)
-            return response
-        except BulkIndexError as e:
-            print("Failure during bulk index: %s" % (six.text_type(e)))
-
     def get_base_qs(self):
         # Some objects have a default ordering, which only slows
         # things down here.
@@ -550,13 +510,63 @@ class Search(FieldMappingMixin):
 
         return qs
 
-    def bulk_delete(self):
-        qs = self.model.objects
-        qs = qs.exclude(id__in=self.get_qs())
+    def index_instance(self, instance):
+        if self.get_qs().filter(pk=instance.pk).exists():
+            self.get_es().index(
+                index=self.get_index(),
+                doc_type=self.get_doc_type(),
+                id=instance.pk,
+                body=self.prepare(instance))
+        else:
+            logger.debug("Un-indexing instance (DB says it it not to be indexed).")
+            self.get_es().delete(
+                index=self.get_index(),
+                doc_type=self.get_doc_type(),
+                id=instance.pk,
+                ignore=404)
+
+    def index_qs(self, qs):
         doc_type = self.get_doc_type()
         index = self.get_index()
+        es = self.get_es()
 
-        print("Un-indexing %d %s instances (DB says not to index)." % (qs.count(), self.model.__name__))
+        actions = [{'_index': index,
+                    '_type': doc_type,
+                    '_id': instance.pk,
+                    '_source': self.prepare(instance)}
+                   for instance in qs.iterator()]
+
+        try:
+            response = bulk(client=es, actions=tuple(actions))
+            es.indices.refresh(index=index)
+            return response
+        except BulkIndexError as e:
+            print("Failure during bulk index: %s" % (six.text_type(e)))
+
+    def bulk_clear(self):
+        doc_type = self.get_doc_type()
+        index = self.get_index()
+        es = self.get_es()
+        results = []
+
+        try:
+            actions = [{'_index': index,
+                        '_type': doc_type,
+                        '_op_type' : 'delete',
+                        '_id': hit.pk}
+                       for hit in self.get_search()]
+            print("Removing all {} instances from {}).".format(
+                len(actions), index))
+            return bulk(client=es, actions=tuple(actions))
+        except BulkIndexError as e:
+            print("Failure during bulk clear: %s" % (six.text_type(e)))
+
+    def bulk_prune(self):
+        qs = self.model.objects.exclude(id__in=self.get_qs())
+        doc_type = self.get_doc_type()
+        index = self.get_index()
+        es = self.get_es()
+
         actions = [{'_index': index,
                     '_type': doc_type,
                     '_op_type' : 'delete',
@@ -564,9 +574,10 @@ class Search(FieldMappingMixin):
                    for instance in qs.iterator()]
 
         try:
-            return bulk(client=self.get_es(), actions=tuple(actions))
+            print("Pruning %d %s instances." % (qs.count(), self.model.__name__))
+            return bulk(client=es, actions=tuple(actions))
         except BulkIndexError as e:
-            print("Failure during bulk delete: %s" % (six.text_type(e)))
+            print("Failure during bulk prune: %s" % (six.text_type(e)))
 
 class SearchMixin(object):
     @classmethod

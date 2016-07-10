@@ -50,10 +50,10 @@ def refresh_search_indexes():
         try:
             es = Elasticsearch(connection['HOSTS'])
             for model in get_search_models():
-                index = model._search_meta().get_index()
+                search = model._search_meta()
+                index = search.get_index()
                 logger.debug("Refreshing index '{}'".format(index))
                 es.indices.refresh(index=index)
-                es.indices.flush(wait_if_ongoing=True)
         except Exception as exc:
             logger.error("Error in 'refresh_search_indexes': {0!s}".format(exc))
 
@@ -62,10 +62,9 @@ def clear_search_indexes():
         try:
             es = Elasticsearch(connection['HOSTS'])
             for model in get_search_models():
-                index = model._search_meta().get_index()
+                search = model._search_meta()
+                index = search.get_index()
                 logger.debug("Clearing index '{}'".format(index))
-                es.indices.delete(index=index)
-                es.indices.create(index=index)
-                es.indices.flush(wait_if_ongoing=True)
+                search.bulk_clear()
         except Exception as exc:
             logger.error("Error in 'clear_search_indexes': {0!s}".format(exc))
