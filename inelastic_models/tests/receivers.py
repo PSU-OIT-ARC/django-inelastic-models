@@ -5,7 +5,7 @@ from django_dynamic_fixture import G
 from django.db import transaction
 from django import test
 
-from inelastic_models.utils import refresh_search_indexes
+from inelastic_models.utils.indexes import refresh_search_indexes
 from inelastic_models.models.test import Model, TEST_MODEL_EXCLUDE_NAME
 from inelastic_models.receivers import get_search_models, suspended_updates
 

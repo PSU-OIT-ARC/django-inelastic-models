@@ -6,7 +6,7 @@ import datetime
 from django_dynamic_fixture import G
 from django import test
 
-from inelastic_models.utils import refresh_search_indexes
+from inelastic_models.utils.indexes import refresh_search_indexes
 from inelastic_models.models.test import Model, SearchFieldModel
 
 from .base import SearchBaseTestCase

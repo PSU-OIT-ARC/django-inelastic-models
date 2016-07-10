@@ -6,8 +6,8 @@ import six
 from django.utils.encoding import python_2_unicode_compatible
 from django.db import models
 
-from .base import (SearchMixin, Search,
-                   NGramField, ListField, ObjectField, MultiObjectField)
+from ..indexes import SearchMixin, Search
+from ..fields import NGramField, ListField, ObjectField, MultiObjectField
 
 TEST_MODEL_EXCLUDE_NAME = 'NO'
 

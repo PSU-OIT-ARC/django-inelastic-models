@@ -15,7 +15,8 @@ from django.dispatch import receiver
 from django.db.models import signals
 from django.apps import apps
 
-from .models import SearchMixin, merge
+from .utils import merge
+from .indexes import SearchMixin
 
 SUSPENSION_BUFFER_TIME = timedelta(seconds=10)
 logger = logging.getLogger(__name__)

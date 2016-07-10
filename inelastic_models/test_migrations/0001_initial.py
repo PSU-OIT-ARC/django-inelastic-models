@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 from django.db import migrations, models
-import inelastic_models.models.base
+import inelastic_models.indexes
 
 
 class Migration(migrations.Migration):
@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 ('date', models.DateField(null=True, blank=True)),
                 ('email', models.EmailField(max_length=254, blank=True)),
             ],
-            bases=(inelastic_models.models.base.SearchMixin, models.Model),
+            bases=(inelastic_models.indexes.SearchMixin, models.Model),
         ),
         migrations.CreateModel(
             name='SearchFieldModel',
@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                 ('modified_on', models.DateTimeField(auto_now=True)),
                 ('related', models.ForeignKey(blank=True, to='inelastic_models.Model', null=True)),
             ],
-            bases=(inelastic_models.models.base.SearchMixin, models.Model),
+            bases=(inelastic_models.indexes.SearchMixin, models.Model),
         ),
         migrations.AddField(
             model_name='model',

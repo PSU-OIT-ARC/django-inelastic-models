@@ -9,7 +9,7 @@ from django_dynamic_fixture import G
 from django.core.management import call_command
 from django import test
 
-from inelastic_models.utils import refresh_search_indexes
+from inelastic_models.utils.indexes import refresh_search_indexes
 from inelastic_models.models.test import Model
 from inelastic_models.receivers import suspended_updates
 from .base import SearchBaseTestCase
