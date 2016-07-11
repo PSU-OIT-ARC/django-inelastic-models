@@ -9,18 +9,18 @@ Introduction
 This package provides a small library for declaratively specifying indexes for `Django`_ models
 using an `Elasticsearch`_ backend.
 
-It requires Django, `elasticsearch-py`_ and an available Elasticsearch instance.
+It requires Django, `elasticsearch-dsl`_ and an available Elasticsearch instance.
 
 .. _Django: https://docs.djangoproject.org
 .. _Elasticsearch: https://www.elastic.co/products/elasticsearch
-.. _elasticsearch-py: https://github.com/elastic/elasticsearch-py
+.. _elasticsearch-dsl: https://github.com/elastic/elasticsearch-dsl-py
 
 Usage
 -----
 
 * Add ``inelastic_models`` to ``INSTALLED_APPS``.
-* Mixin the type ``inelastic_models.models.SearchMixin`` to your models.
-* Implement a type ``inelastic_models.models.Search`` and bind it to models::
+* Mixin the type ``inelastic_models.indexes.SearchMixin`` to your models.
+* Implement a type ``inelastic_models.indexes.Search`` and bind it to models::
 
     from .models import Foo
 
@@ -31,7 +31,7 @@ Usage
 
 * You must define ``ELASTICSEARCH_CONNECTIONS``::
 
-    ELASTICSEARCH_CONNECTIONS={
+    ELASTICSEARCH_CONNECTIONS = {
         'default': {
             'HOSTS': ['http://localhost:9200'],
             'INDEX_NAME': 'inelastic_models',
