@@ -158,6 +158,31 @@ class Search(FieldMappingMixin):
             es.indices.refresh(index=index)
             es.indices.flush(wait_if_ongoing=True)
 
+    def check_mapping(self):
+        doc_type = self.get_doc_type()
+        mapping = self.get_mapping()
+        index = self.get_index()
+        es = self.get_es()
+
+        if not es.indices.exists(index=index):
+            return False
+
+        def validate_properties(lhs, rhs):
+            for name, info in six.iteritems(lhs):
+                if name not in rhs:
+                    return False
+                if info['type'] != rhs[name]['type']:
+                    return False
+                if 'properties' in info:
+                    validate_properties(info['properties'],
+                                        rhs[name]['properties'])
+            return True
+
+        installed_mapping = es.indices.get_mapping(index=index, doc_type=doc_type) \
+            .get(index).get('mappings').get(doc_type)
+        return validate_properties(mapping.get('properties'),
+                                   installed_mapping.get('properties'))
+
     def put_mapping(self):
         """
         Initializes a (possibly new) index and installs the given mapping.
