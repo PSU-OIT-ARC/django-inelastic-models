@@ -9,8 +9,8 @@ from django_dynamic_fixture import G
 from django.core.management import call_command
 from django import test
 
-from inelastic_models.utils import refresh_search_indexes
-from inelastic_models.models.test import Model
+from inelastic_models.utils.indexes import refresh_search_indexes
+from inelastic_models.models.test import Model, ModelSearch
 from inelastic_models.receivers import suspended_updates
 from .base import SearchBaseTestCase
 
@@ -91,3 +91,20 @@ class UpdateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
         G(Model, name='Test2')
         refresh_search_indexes()
         self.assertEqual(Model.search.count(), 2)
+
+class MigrateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
+    command_name = 'migrate_index'
+
+    def setUp(self):
+        super(MigrateIndexCommandTestCase, self).setUp()
+
+        G(Model, name='Test2', non_indexed_field='Hack the Gibson.')
+        ModelSearch.attribute_fields.append('non_indexed_field')
+
+    def check_command_response(self, response, **kwargs):
+        super(SearchCommandTestCase, self).check_command_response(
+            response, **kwargs)
+
+        refresh_search_indexes()
+        self.assertEqual(Model.search.query('match', test_ngram='Test').count(), 2)
+        self.assertEqual(Model.search.query('match', non_indexed_field='Hack the Gibson.').count(), 1)

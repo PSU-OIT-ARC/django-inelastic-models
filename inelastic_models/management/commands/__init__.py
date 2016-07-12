@@ -17,8 +17,6 @@ DURATION_RE = re.compile(
 
 
 class IndexCommand(BaseCommand):
-    help = 'Creates and populates the search index.  If it already exists, it is deleted first.'
-
     def add_arguments(self, parser):
         parser.add_argument('args', nargs='*', type=six.text_type)
         parser.add_argument('--since', action="store", default='', dest='since',
@@ -53,6 +51,9 @@ class IndexCommand(BaseCommand):
 
         return models
 
+    def handle_operation(self, search, queryset):
+        raise NotImplementedError
+
     def handle(self, *args, **options):
         models = self.get_models(args)
         if not models:
@@ -70,6 +71,3 @@ class IndexCommand(BaseCommand):
             search = model._search_meta()
             queryset = search.get_qs(since=since, limit=limit)
             self.handle_operation(search, queryset)
-
-    def handle_operation(self, search, queryset):
-        raise NotImplementedError

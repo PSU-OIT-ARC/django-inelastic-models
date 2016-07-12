@@ -6,8 +6,8 @@ from django.test.runner import DiscoverRunner
 
 from inelastic_models.models.test import Model, SearchFieldModel
 from inelastic_models.receivers import get_search_models
-from inelastic_models.utils import (refresh_search_indexes,
-                                    clear_search_indexes)
+from inelastic_models.utils.indexes import (refresh_search_indexes,
+                                            clear_search_indexes)
 
 
 class SearchTestRunner(DiscoverRunner):

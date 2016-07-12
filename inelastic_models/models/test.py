@@ -6,8 +6,8 @@ import six
 from django.utils.encoding import python_2_unicode_compatible
 from django.db import models
 
-from .base import (SearchMixin, Search,
-                   NGramField, ListField, ObjectField, MultiObjectField)
+from ..indexes import SearchMixin, Search
+from ..fields import NGramField, ListField, ObjectField, MultiObjectField
 
 TEST_MODEL_EXCLUDE_NAME = 'NO'
 
@@ -22,6 +22,7 @@ class Model(SearchMixin, models.Model):
                                   null=True, blank=True)
     test_m2m = models.ManyToManyField('inelastic_models.SearchFieldModel', blank=True)
     email = models.EmailField(blank=True)
+    non_indexed_field = models.CharField(max_length=16, blank=True)
 
     @property
     def count_m2m(self):
@@ -34,9 +35,9 @@ class Model(SearchMixin, models.Model):
         app_label = 'inelastic_models'
 
 class ModelSearch(Search):
-    attribute_fields = ['date', 'email', 'count_m2m']
+    attribute_fields = ['name', 'date', 'email', 'count_m2m']
     other_fields = {
-        'name': NGramField('name'),
+        'test_ngram': NGramField('name'),
     }
 
     def get_base_qs(self):
