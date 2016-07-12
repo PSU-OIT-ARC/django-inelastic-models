@@ -53,6 +53,9 @@ class IndexCommand(BaseCommand):
 
         return models
 
+    def handle_operation(self, search, queryset):
+        raise NotImplementedError
+
     def handle(self, *args, **options):
         models = self.get_models(args)
         if not models:
@@ -70,6 +73,3 @@ class IndexCommand(BaseCommand):
             search = model._search_meta()
             queryset = search.get_qs(since=since, limit=limit)
             self.handle_operation(search, queryset)
-
-    def handle_operation(self, search, queryset):
-        raise NotImplementedError

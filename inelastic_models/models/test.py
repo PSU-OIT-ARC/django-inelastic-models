@@ -22,6 +22,7 @@ class Model(SearchMixin, models.Model):
                                   null=True, blank=True)
     test_m2m = models.ManyToManyField('inelastic_models.SearchFieldModel', blank=True)
     email = models.EmailField(blank=True)
+    non_indexed_field = models.CharField(max_length=16, blank=True)
 
     @property
     def count_m2m(self):
