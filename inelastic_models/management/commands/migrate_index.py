@@ -8,6 +8,8 @@ class Command(IndexCommand):
     """
     TBD
     """
+    help = 'Updates the index mapping, if necessary. This operation destroys the existing index.'
+
     def handle_operation(self, search, queryset):
         if search.check_mapping():
             print("Mapping '{}' does not require migration.".format(search))

@@ -17,8 +17,6 @@ DURATION_RE = re.compile(
 
 
 class IndexCommand(BaseCommand):
-    help = 'Creates and populates the search index.  If it already exists, it is deleted first.'
-
     def add_arguments(self, parser):
         parser.add_argument('args', nargs='*', type=six.text_type)
         parser.add_argument('--since', action="store", default='', dest='since',

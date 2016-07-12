@@ -8,6 +8,8 @@ class Command(IndexCommand):
     """
     TBD
     """
+    help = 'Updates the search index to synchronize it with the corresponding data model store.'
+
     def handle_operation(self, search, queryset):
         print("Indexing %d %s objects" % (
             queryset.count(), search.model.__name__))
