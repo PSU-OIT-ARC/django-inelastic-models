@@ -253,7 +253,7 @@ class FieldMappingMixin(object):
 
     def get_index_settings(self):
         connection_info = settings.ELASTICSEARCH_CONNECTIONS[self.connection]
-        config = connection_info.get('OPTIONS', {})
+        config = connection_info.get('INDEX_OPTIONS', {})
         logger.debug("Using configuration: %s" % (config))
 
         if not config:

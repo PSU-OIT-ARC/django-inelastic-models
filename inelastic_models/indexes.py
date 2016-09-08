@@ -87,8 +87,10 @@ class Search(FieldMappingMixin):
     def get_es(self):
         es_client = getattr(_cache, 'es_client', None)
         if es_client is None:
-            host_list = settings.ELASTICSEARCH_CONNECTIONS[self.connection]['HOSTS']
-            es_client = Elasticsearch(hosts=host_list)
+            config = settings.ELASTICSEARCH_CONNECTIONS[self.connection]
+            (host_list, options) = (config.get('HOSTS', []),
+                                    config.get('CONNECTION_OPTIONS', {}))
+            es_client = Elasticsearch(hosts=host_list, **options)
             setattr(_cache, 'es_client', es_client)
 
         return es_client

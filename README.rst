@@ -38,6 +38,19 @@ Usage
         }
     },
 
+To pass connection parameters to the ``Elasticsearch`` instance,
+use the ``OPTIONS`` key::
+
+    ELASTICSEARCH_CONNECTIONS = {
+        'default': {
+	    ...
+
+	    'OPTIONS': {
+	        'timeout': 42,
+		'retry_on_timeout': True
+	    }
+        }
+    },
 
 Tests
 -----
