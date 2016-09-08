@@ -29,13 +29,17 @@ Usage
 
     FooIndex.bind_to_model(Foo)
 
-You must define ``ELASTICSEARCH_CONNECTIONS``. Pass connection parameters to the
-underlying ``Elasticsearch`` instance via the ``CONNECTION_OPTIONS`` mapping::
+You must define ``ELASTICSEARCH_CONNECTIONS``. Pass index and connection parameters
+to the generated indices and the underlying ``Elasticsearch`` instance via the
+``INDEX_OPTIONS`` and ``CONNECTION_OPTIONS`` mappings, respectively::
 
     ELASTICSEARCH_CONNECTIONS = {
         'default': {
             'HOSTS': ['http://localhost:9200'],
             'INDEX_NAME': 'inelastic_models',
+	    'INDEX_OPTIONS': {
+	        'number_of_replicas': 3
+	    },
 	    'CONNECTION_OPTIONS': {
 	        'timeout': 42,
 		'retry_on_timeout': True
