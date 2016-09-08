@@ -2,6 +2,11 @@
 CHANGELOG
 =========
 
+1.3
+---
+
+* Adds support for connection parameter configuration via 'ELASTICSEARCH_CONNECTIONS'.
+
 1.2
 ---
 

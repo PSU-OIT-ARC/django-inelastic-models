@@ -18,9 +18,9 @@ It requires Django, `elasticsearch-dsl`_ and an available Elasticsearch instance
 Usage
 -----
 
-* Add ``inelastic_models`` to ``INSTALLED_APPS``.
-* Mixin the type ``inelastic_models.indexes.SearchMixin`` to your models.
-* Implement a type ``inelastic_models.indexes.Search`` and bind it to models::
+1. Add ``inelastic_models`` to ``INSTALLED_APPS``.
+2. Mixin the type ``inelastic_models.indexes.SearchMixin`` to your models.
+3. Implement a type ``inelastic_models.indexes.Search`` and bind it to models::
 
     from .models import Foo
 
@@ -29,23 +29,14 @@ Usage
 
     FooIndex.bind_to_model(Foo)
 
-* You must define ``ELASTICSEARCH_CONNECTIONS``::
+You must define ``ELASTICSEARCH_CONNECTIONS``. Pass connection parameters to the
+underlying ``Elasticsearch`` instance via the ``CONNECTION_OPTIONS`` mapping::
 
     ELASTICSEARCH_CONNECTIONS = {
         'default': {
             'HOSTS': ['http://localhost:9200'],
             'INDEX_NAME': 'inelastic_models',
-        }
-    },
-
-To pass connection parameters to the ``Elasticsearch`` instance,
-use the ``OPTIONS`` key::
-
-    ELASTICSEARCH_CONNECTIONS = {
-        'default': {
-	    ...
-
-	    'OPTIONS': {
+	    'CONNECTION_OPTIONS': {
 	        'timeout': 42,
 		'retry_on_timeout': True
 	    }
