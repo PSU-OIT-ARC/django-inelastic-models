@@ -2,6 +2,11 @@
 CHANGELOG
 =========
 
+1.4
+---
+
+* Adds explicit support for translated fields.
+
 1.3
 ---
 
