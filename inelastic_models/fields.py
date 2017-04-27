@@ -107,6 +107,18 @@ class StringField(AttributeField):
             value = value()
         return six.text_type(value) or ""
 
+class TranslationField(StringField):
+    def __init__(self, attr, *args, **kwargs):
+        self.language_name = kwargs.pop('language', None)
+        super(TranslationField, self).__init__(attr, *args, **kwargs)
+
+    def get_field_mapping(self):
+        mapping = super(TranslationField, self).get_field_mapping()
+        if self.language_name is not None:
+            mapping['analyzer'] = self.language_name
+        return mapping
+
+
 class NGramField(StringField):
     min_gram = 2
     max_gram = 4
