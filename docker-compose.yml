@@ -1,0 +1,19 @@
+version: '3'
+networks:
+  default:
+    driver: bridge
+
+services:
+  elasticsearch:
+    image: elasticsearch:2
+    networks:
+      - default
+
+  test:
+    build:
+      context: .
+    command: make test
+    networks:
+      - default
+    volumes:
+      - .:/root
