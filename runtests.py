@@ -31,6 +31,7 @@ settings.configure(
     TEMPLATES=[{
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'OPTIONS': {
+            'context_processors': ['django.contrib.auth.context_processors.auth'],
             'loaders': [
                 ('django.template.loaders.locmem.Loader', {
                     'test_index_template_name.txt': 'Template_{{ object.name }}',
