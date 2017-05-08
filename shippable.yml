@@ -1,7 +1,0 @@
-language: python
-services:
-  - elasticsearch
-build:
-  ci:
-    - pip install tox
-    - tox

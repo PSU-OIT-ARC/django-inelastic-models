@@ -1,0 +1,12 @@
+image: python:3.5
+
+stages:
+- test
+
+test_job:
+  stage: test
+  services:
+  - elasticsearch:2
+  script:
+  - apt-get update && apt-get install -y make libgdal1h
+  - make test

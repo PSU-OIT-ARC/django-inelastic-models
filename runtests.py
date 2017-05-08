@@ -24,7 +24,7 @@ settings.configure(
     MIDDLEWARE_CLASSES=[],
     ELASTICSEARCH_CONNECTIONS={
         'default': {
-            'HOSTS': ['http://localhost:9200'],
+            'HOSTS': ['http://elasticsearch:9200'],
             'INDEX_NAME': 'inelastic_models',
         }
     },

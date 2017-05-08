@@ -2,7 +2,8 @@
 README
 ======
 
-.. image:: https://api.shippable.com/projects/5733d0a22a8192902e1fc666/badge?branch=master
+.. image:: https://gitlab.com/psu-webteam/django-inelastic-models/badges/master/build.svg
+   :target: https://gitlab.com/psu-webteam/django-inelastic-models/commits/master
 
 Introduction
 ------------
@@ -49,10 +50,9 @@ to the generated indices and the underlying ``Elasticsearch`` instance via the
 
 Tests
 -----
-Use `tox`_ to run the test suite. Run tests independently using ``make``::
+Run tests using the ``make`` rule::
 
     make test [venv=<path>] [python=<python executable name, e.g., 'python3.5'>]
 
-It is assumed that you have ``tox`` and ``virtualenv`` available on your path.
-
-.. _tox: https://testrun.org/tox/latest/
+It is assumed that you have and Elasticsearch index available at ``elasticsearch:9200`` and that
+``virtualenv`` available on your path.
