@@ -6,7 +6,7 @@ import logging
 import six
 
 from django.template.loader import render_to_string
-from django.core.exceptions import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db.models.fields.related import ForeignObjectRel
 from django.db import models
 from django.conf import settings
@@ -89,11 +89,15 @@ class AttributeField(SearchField):
                 return None
 
             try:
-                options = instance._meta
                 instance = getattr(instance, attr)
             except AttributeError as exc:
                 msg = "'{0}' not defined on {1}: {2!s}"
                 logger.warning(msg.format(self.path, instance, exc))
+                return None
+            except ObjectDoesNotExist as exc:
+                msg = "Reference '{}' on '{}' does not exist."
+                logger.warning(msg.format(attr, instance))
+                return None
 
         return instance
 
