@@ -228,21 +228,21 @@ class FieldMappingMixin(object):
             field = model._meta.get_field(path[-1])
 
             if isinstance(field, models.BooleanField):
-                return name, BooleanField(attr=attr)
+                return (name, BooleanField(attr=attr))
             elif isinstance(field, models.IntegerField):
-                return name, IntegerField(attr=attr)
+                return (name, IntegerField(attr=attr))
             elif isinstance(field, models.DateField):
-                return name, DateField(attr=attr)
+                return (name, DateField(attr=attr))
             elif isinstance(field, models.EmailField):
-                return name, StringField(attr=attr, index='not_analyzed')
+                return (name, StringField(attr=attr, index='not_analyzed'))
             elif isinstance(field, models.ManyToManyField) or \
                  isinstance(field, ForeignObjectRel):
-                return name, MultiField(attr=attr)
+                return (name, MultiField(attr=attr))
             else:
-                return name, StringField(attr=attr)
+                return (name, StringField(attr=attr))
 
         except models.FieldDoesNotExist:
-            return name, StringField(attr=attr)
+            return (name, StringField(attr=attr))
         except AttributeError as exc:
             if not hasattr(self, 'model'):
                 return (name, StringField(attr=attr))
