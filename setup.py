@@ -14,6 +14,6 @@ setup(
                       'elasticsearch-dsl>=2.0.0,<5.0.0'],
     extras_require={
         'test': ["django" + ("<1.7" if sys.version_info[:2] < (2, 7) else ""),
-                 'django-dynamic-fixture'],
+                 'django-dynamic-fixture']
     }
 )
