@@ -3,7 +3,7 @@
 
 SHELL=/bin/bash
 
-python ?= python3.5
+python ?= python3
 venv ?= .env
 
 remote_user ?= `whoami`

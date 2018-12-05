@@ -5,7 +5,7 @@ from django import VERSION
 
 
 settings.configure(
-    DEBUG=True,
+    DEBUG=False,
     DATABASES={
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',

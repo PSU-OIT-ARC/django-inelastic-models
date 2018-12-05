@@ -16,4 +16,4 @@ services:
     networks:
       - default
     volumes:
-      - .:/root
+      - .:/django-inelastic-models

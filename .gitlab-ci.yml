@@ -18,3 +18,12 @@ test_job:3.5:
   script:
   - apt-get update && apt-get install -y make libgdal1h
   - make test python="python3.5"
+
+test_job:3.6:
+  image: python:3.6
+  stage: test
+  services:
+  - elasticsearch:2
+  script:
+  - apt-get update && apt-get install -y make libgdal1h
+  - make test python="python3.6"
