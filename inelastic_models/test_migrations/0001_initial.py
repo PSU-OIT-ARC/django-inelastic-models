@@ -28,14 +28,14 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('modified_on', models.DateTimeField(auto_now=True)),
-                ('related', models.ForeignKey(blank=True, to='inelastic_models.Model', null=True)),
+                ('related', models.ForeignKey(blank=True, on_delete=models.CASCADE, to='inelastic_models.Model', null=True)),
             ],
             bases=(inelastic_models.indexes.SearchMixin, models.Model),
         ),
         migrations.AddField(
             model_name='model',
             name='test_list',
-            field=models.ForeignKey(related_name='models', blank=True, to='inelastic_models.SearchFieldModel', null=True),
+            field=models.ForeignKey(related_name='models', blank=True, on_delete=models.SET_NULL, to='inelastic_models.SearchFieldModel', null=True),
         ),
         migrations.AddField(
             model_name='model',

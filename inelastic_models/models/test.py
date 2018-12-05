@@ -19,8 +19,10 @@ class Model(SearchMixin, models.Model):
     date = models.DateField(null=True, blank=True)
     test_list = models.ForeignKey('inelastic_models.SearchFieldModel',
                                   related_name='models',
+                                  on_delete=models.SET_NULL,
                                   null=True, blank=True)
-    test_m2m = models.ManyToManyField('inelastic_models.SearchFieldModel', blank=True)
+    test_m2m = models.ManyToManyField('inelastic_models.SearchFieldModel',
+                                      blank=True)
     email = models.EmailField(blank=True)
     non_indexed_field = models.CharField(max_length=16, blank=True)
 
@@ -48,7 +50,9 @@ ModelSearch.bind_to_model(Model)
 @python_2_unicode_compatible
 class SearchFieldModel(SearchMixin, models.Model):
     modified_on = models.DateTimeField(auto_now=True)
-    related = models.ForeignKey('inelastic_models.Model', null=True, blank=True)
+    related = models.ForeignKey('inelastic_models.Model',
+                                on_delete=models.CASCADE,
+                                null=True, blank=True)
 
     def __str__(self):
         return six.text_type("Related: %s" % (self.related))
