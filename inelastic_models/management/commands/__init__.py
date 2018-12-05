@@ -21,6 +21,8 @@ class IndexCommand(BaseCommand):
         parser.add_argument('args', nargs='*', type=six.text_type)
         parser.add_argument('--since', action="store", default='', dest='since',
                             help='Index data updated after this time.  yyyy-mm-dd[-hh:mm] or [#d][#h][#m][#s]')
+        parser.add_argument('--until', action="store", default='', dest='until',
+                            help='Index data updated before this time.  yyyy-mm-dd[-hh:mm] or [#d][#h][#m][#s]')
         parser.add_argument('--limit', action="store", default='', dest='limit',
                             help='Index at most this many of each model.')
 
