@@ -72,7 +72,7 @@ class Search(FieldMappingMixin):
         if self.doc_type is not None:
             return self.doc_type
         else:
-            return "%s_%s" % (self.model._meta.app_label, self.model._meta.model_name)
+            return "{}_{}".format(self.model._meta.app_label, self.model._meta.model_name)
 
     def get_dependencies(self):
         dependencies = self.dependencies
@@ -113,7 +113,7 @@ class Search(FieldMappingMixin):
             logger.warning("Deleting index '{}'".format(index))
             es.indices.delete(index)
 
-        logger.debug("Creating index '%s'" % (index))
+        logger.debug("Creating index '{}'".format(index))
         es.indices.create(index)
         es.indices.refresh(index=index)
         es.cluster.health(wait_for_status='yellow')
@@ -133,10 +133,13 @@ class Search(FieldMappingMixin):
         config = self.get_index_settings()
         index_settings = config.pop('index', {})
         if index_settings and index_settings.get('number_of_replicas', None) is not None:
-            logger.debug("Setting number_of_replicas=%d on '%s'" % (
-                index_settings.get('number_of_replicas'), index))
+            log_msg = "Setting number_of_replicas={} on '{}'"
+            logger.debug(log_msg.format(index_settings.get('number_of_replicas'), index))
             replica_settings = {
-                'index': {'number_of_replicas': index_settings.pop('number_of_replicas')}}
+                'index': {
+                    'number_of_replicas': index_settings.pop('number_of_replicas')
+                }
+            }
             es.indices.open(index)
             es.indices.put_settings(replica_settings, index)
             es.indices.refresh(index=index)
@@ -149,12 +152,12 @@ class Search(FieldMappingMixin):
 
         try:
             es.indices.close(index)
-            logger.debug("Updating settings for index '%s': %s" % (index, settings))
+            logger.debug("Updating settings for index '{}': {}".format(index, settings))
             es.indices.put_settings(settings, index)
         except exceptions.RequestError as e:
             if settings:
                 raise e
-            logger.debug("No settings to update for index '%s'" % (index))
+            logger.debug("No settings to update for index '{}'".format(index))
         finally:
             es.indices.open(index)
             es.indices.refresh(index=index)
@@ -197,7 +200,8 @@ class Search(FieldMappingMixin):
         index = self.get_index()
         es = self.get_es()
 
-        logger.debug("Updating mapping for index '%s' and doc type '%s': %s" % (index, doc_type, mapping))
+        log_msg = "Updating mapping for index '{}' and doc type '{}': {}"
+        logger.debug(log_msg.format(index, doc_type, mapping))
         es.indices.put_mapping(doc_type, mapping, index=index)
 
     def get_base_qs(self):
@@ -210,9 +214,9 @@ class Search(FieldMappingMixin):
         filters = {}
 
         if since:
-            filters["%s__gte" % self.date_field] = since
+            filters["{}__gte".format(self.date_field)] = since
         if until:
-            filters["%s__lte" % self.date_field] = until
+            filters["{}__lte".format(self.date_field)] = until
 
         qs = qs.filter(**filters)
 
@@ -252,7 +256,7 @@ class Search(FieldMappingMixin):
             es.indices.refresh(index=index)
             return response
         except BulkIndexError as e:
-            print("Failure during bulk index: %s" % (six.text_type(e)))
+            logger.error("Failure during bulk index: {}".format(six.text_type(e)))
 
     def bulk_clear(self):
         doc_type = self.get_doc_type()
@@ -266,11 +270,11 @@ class Search(FieldMappingMixin):
                         '_op_type' : 'delete',
                         '_id': hit.pk}
                        for hit in self.get_search()]
-            print("Removing all {} instances from {}).".format(
-                len(actions), index))
+            log_msg = "Removing all {} instances from {})."
+            logger.info(log_msg.format(len(actions), index))
             return bulk(client=es, actions=tuple(actions))
         except BulkIndexError as e:
-            print("Failure during bulk clear: %s" % (six.text_type(e)))
+            logger.error("Failure during bulk clear: {}".format(six.text_type(e)))
 
     def bulk_prune(self):
         qs = self.model.objects.exclude(id__in=self.get_qs())
@@ -285,15 +289,15 @@ class Search(FieldMappingMixin):
                    for instance in qs.iterator()]
 
         try:
-            print("Pruning %d %s instances." % (qs.count(), self.model.__name__))
+            logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
             return bulk(client=es, actions=tuple(actions))
         except BulkIndexError as e:
-            print("Failure during bulk prune: %s" % (six.text_type(e)))
+            logger.error("Failure during bulk prune: {}".format(six.text_type(e)))
 
 class SearchDescriptor(object):
     def __get__(self, instance, type=None):
         if instance != None:
-            raise AttributeError("Search isn't accessible via %s instances" % type.__name__)
+            raise AttributeError("Search isn't accessible via {} instances".format(type.__name__))
         return type._search_meta().get_search()
 
 class SearchMixin(object):

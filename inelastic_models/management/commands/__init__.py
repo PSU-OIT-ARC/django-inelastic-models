@@ -40,14 +40,14 @@ class IndexCommand(BaseCommand):
             kwargs = dict((k, int(v)) for (k, v) in list(match.groupdict().items()) if v is not None)
             return datetime.now() - timedelta(**kwargs)
 
-        raise ValueError("%s could not be interpereted as a datetime" % timestamp)
+        raise ValueError("{} could not be interpereted as a datetime".format(timestamp))
 
     def get_models(self, args):
         models = get_search_models()
         if args:
             models = [m for m in models if
                       m._meta.app_label in args or
-                      '%s.%s' % (m._meta.app_label, m._meta.model_name) in args]
+                      '{}.{}'.format(m._meta.app_label, m._meta.model_name) in args]
 
         return models
 

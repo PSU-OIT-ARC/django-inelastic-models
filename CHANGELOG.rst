@@ -6,6 +6,7 @@ CHANGELOG
 ---
 
 * Adds explicit support for translated fields.
+* Replaces uses of print function.
 
 1.3
 ---
