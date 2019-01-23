@@ -227,13 +227,14 @@ class Search(FieldMappingMixin):
 
     def index_instance(self, instance):
         if self.get_qs().filter(pk=instance.pk).exists():
+            logger.debug("Indexing instance '{}'".format(instance))
             self.get_es().index(
                 index=self.get_index(),
                 doc_type=self.get_doc_type(),
                 id=instance.pk,
                 body=self.prepare(instance))
         else:
-            logger.debug("Un-indexing instance (DB says it it not to be indexed).")
+            logger.debug("Un-indexing instance '{}'".format(instance))
             self.get_es().delete(
                 index=self.get_index(),
                 doc_type=self.get_doc_type(),
@@ -292,7 +293,7 @@ class Search(FieldMappingMixin):
             logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
             return bulk(client=es, actions=tuple(actions))
         except BulkIndexError as e:
-            logger.error("Failure during bulk prune: {}".format(six.text_type(e)))
+            logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
 
 class SearchDescriptor(object):
     def __get__(self, instance, type=None):
