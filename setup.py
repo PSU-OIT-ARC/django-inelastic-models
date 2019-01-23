@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='DjangoInelasticModels',
-    version='1.4.2',
+    version='1.4.3',
     author='Thom Linton',
     author_email='tlinton@pdx.edu',
     url='https://github.com/PSU-OIT-ARC/django-inelastic-models',
