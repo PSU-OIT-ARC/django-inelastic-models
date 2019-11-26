@@ -22,6 +22,7 @@ def refresh_search_indexes():
         except Exception as exc:
             logger.error("Error in 'refresh_search_indexes': {0!s}".format(exc))
 
+
 def clear_search_indexes():
     for name, connection in list(settings.ELASTICSEARCH_CONNECTIONS.items()):
         try:

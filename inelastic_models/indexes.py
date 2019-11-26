@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import threading
 import logging
 import six
+import gc
 
 from elasticsearch.helpers import bulk, BulkIndexError
 from elasticsearch import Elasticsearch
@@ -12,12 +13,52 @@ import elasticsearch_dsl as dsl
 
 from django.conf import settings
 from django.apps import apps
+from django.db import models
 
 from .fields import FieldMappingMixin, EmailURLAllField
 from .utils import merge
 
 logger = logging.getLogger(__name__)
+
+CHUNKSIZE = 1000
 _cache = threading.local()
+
+
+def queryset_iterator(queryset, chunksize=CHUNKSIZE):
+    """
+    Iterate over a Django Queryset ordered by the primary key
+
+    This method loads a maximum of chunksize (default: 1000) rows in it's
+    memory at the same time while django normally would load all rows in it's
+    memory. Using the iterator() method only causes it to not preload all the
+    classes.
+
+    Note that this implementation does not support ordered query sets.
+
+    Taken from: http://djangosnippets.org/snippets/1949/
+    """
+    logger.info("Using chunk size {}".format(chunksize))
+
+    if not queryset.exists():
+        return queryset.none()
+
+    ordering = queryset.model._meta.pk.get_attname()
+    pk = getattr(queryset.order_by('-{}'.format(ordering))[0], ordering) + 1
+    last_pk = getattr(queryset.order_by(ordering)[0], ordering)
+
+    queryset = queryset.order_by('-{}'.format(ordering))
+    total = 0
+    while pk > last_pk:
+        chunk = queryset.filter(pk__lt=pk)[:chunksize]
+        pk = getattr(chunk[len(chunk) - 1], ordering)
+        total += len(chunk)
+        yield chunk
+
+        log_msg = "Visited {} records, {} remaining"
+        logger.info(log_msg.format(total, queryset.filter(pk__lt=pk).count()))
+        gc.collect()
+
+    logger.info("Iterated {} records".format(total))
 
 
 class AwareResult(dsl.result.Result):
@@ -32,11 +73,12 @@ class AwareResult(dsl.result.Result):
             return cls(document, search_meta)
         return callback
 
+
 class Search(FieldMappingMixin):
     doc_type = None
     connection = 'default'
     mapping = None
-    index_by = 1000
+    index_by = CHUNKSIZE
     date_field = 'modified_on'
     all_field = EmailURLAllField()
 
@@ -246,24 +288,43 @@ class Search(FieldMappingMixin):
         index = self.get_index()
         es = self.get_es()
 
-        actions = [{'_index': index,
-                    '_type': doc_type,
-                    '_id': instance.pk,
-                    '_source': self.prepare(instance)}
-                   for instance in qs.iterator()]
-
         try:
-            response = bulk(client=es, actions=tuple(actions))
-            es.indices.refresh(index=index)
-            return response
-        except BulkIndexError as e:
-            logger.error("Failure during bulk index: {}".format(six.text_type(e)))
+            responses = []
+
+            try:
+                for chunk in queryset_iterator(qs, chunksize=self.index_by):
+                    actions = [
+                        {'_index': index,
+                         '_type': doc_type,
+                         '_id': instance.pk,
+                         '_source': self.prepare(instance)}
+                        for instance in chunk.iterator()
+                    ]
+                    responses.append(bulk(client=es, actions=tuple(actions)))
+                    es.indices.refresh(index=index)
+            except BulkIndexError as e:
+                logger.error("Failure during bulk index: {}".format(six.text_type(e)))
+            else:
+                return responses
+        except AssertionError:
+            try:
+                actions = [
+                    {'_index': index,
+                     '_type': doc_type,
+                     '_id': instance.pk,
+                     '_source': self.prepare(instance)}
+                    for instance in qs.iterator()
+                ]
+                response = bulk(client=es, actions=tuple(actions))
+                es.indices.refresh(index=index)
+                return response
+            except BulkIndexError as e:
+                logger.error("Failure during bulk index: {}".format(six.text_type(e)))
 
     def bulk_clear(self):
         doc_type = self.get_doc_type()
         index = self.get_index()
         es = self.get_es()
-        results = []
 
         try:
             actions = [{'_index': index,
@@ -278,28 +339,50 @@ class Search(FieldMappingMixin):
             logger.error("Failure during bulk clear: {}".format(six.text_type(e)))
 
     def bulk_prune(self):
-        qs = self.model.objects.exclude(id__in=self.get_qs())
         doc_type = self.get_doc_type()
         index = self.get_index()
         es = self.get_es()
-
-        actions = [{'_index': index,
-                    '_type': doc_type,
-                    '_op_type' : 'delete',
-                    '_id': instance.pk }
-                   for instance in qs.iterator()]
+        qs = self.model.objects.exclude(id__in=self.get_qs())
 
         try:
-            logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
-            return bulk(client=es, actions=tuple(actions))
-        except BulkIndexError as e:
-            logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
+            responses = []
+
+            try:
+                for chunk in queryset_iterator(qs, chunksize=self.index_by):
+                    actions = [
+                        {'_index': index,
+                         '_type': doc_type,
+                         '_op_type' : 'delete',
+                         '_id': instance.pk}
+                        for instance in chunk.iterator()
+                    ]
+                    logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
+                    responses.append(bulk(client=es, actions=tuple(actions)))
+            except BulkIndexError as e:
+                logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
+            else:
+                return responses
+        except AssertionError:
+            try:
+                actions = [
+                    {'_index': index,
+                     '_type': doc_type,
+                     '_id': instance.pk,
+                     '_source': self.prepare(instance)}
+                    for instance in qs.iterator()
+                ]
+                logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
+                return bulk(client=es, actions=tuple(actions))
+            except BulkIndexError as e:
+                logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
+
 
 class SearchDescriptor(object):
     def __get__(self, instance, type=None):
         if instance != None:
             raise AttributeError("Search isn't accessible via {} instances".format(type.__name__))
         return type._search_meta().get_search()
+
 
 class SearchMixin(object):
     @classmethod

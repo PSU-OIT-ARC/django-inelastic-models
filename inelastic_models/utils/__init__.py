@@ -35,6 +35,7 @@ def merge(items, overwrite=True):
             return items[-1]
         raise ValueError("Collision while merging. Values: %s" % items)
 
+
 def autoload_submodules(submodules):
     """
     Autoload the given submodules for all apps in INSTALLED_APPS.
@@ -42,15 +43,15 @@ def autoload_submodules(submodules):
     This utility was inspired by 'admin.autodiscover'.
     """
     for app in apps.get_app_configs():
-        logger.debug("Analyzing app '%s' for modules '%s'" % (app, submodules))
+        logger.debug("Analyzing app '{}' for modules '{}'".format(app, submodules))
         for submodule in submodules:
             dotted_path = "{0}.{1}".format(app.name, submodule)
             try:
                 importlib.import_module(dotted_path)
             except:
                 if module_has_submodule(app.module, submodule):
-                    msg = "Trouble importing module '%s'"
-                    logger.warn(msg % (dotted_path))
+                    msg = "Trouble importing module '{}'"
+                    logger.warn(msg.format(dotted_path))
                     raise
             else:
-                logger.debug("Imported module '%s'" % (dotted_path))
+                logger.debug("Imported module '{}'".format(dotted_path))
