@@ -7,6 +7,7 @@ CHANGELOG
 
 * Adds explicit support for translated fields.
 * Replaces uses of print function.
+* Uses memory-efficient record iteration for bulk operations.
 
 1.3
 ---
