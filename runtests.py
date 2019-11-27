@@ -15,7 +15,7 @@ settings.configure(
         'django.contrib.auth',
         'django.contrib.contenttypes',
         'django.contrib.sessions',
-        'django.contrib.admin',
+
         'inelastic_models',
     ),
     MIGRATION_MODULES={
