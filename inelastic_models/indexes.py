@@ -289,9 +289,11 @@ class Search(FieldMappingMixin):
         es = self.get_es()
 
         try:
-            responses = []
+            assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
 
+            responses = []
             try:
+                return
                 for chunk in queryset_iterator(qs, chunksize=self.index_by):
                     actions = [
                         {'_index': index,
@@ -342,12 +344,14 @@ class Search(FieldMappingMixin):
         doc_type = self.get_doc_type()
         index = self.get_index()
         es = self.get_es()
-        qs = self.model.objects.exclude(id__in=self.get_qs())
+        qs = self.model.objects.difference(self.get_qs())
 
         try:
-            responses = []
+            assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
 
+            responses = []
             try:
+                return
                 for chunk in queryset_iterator(qs, chunksize=self.index_by):
                     actions = [
                         {'_index': index,
