@@ -289,8 +289,8 @@ class Search(FieldMappingMixin):
             assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
 
             responses = []
-            try:
-                for chunk in queryset_iterator(qs, chunksize=self.index_by):
+            for chunk in queryset_iterator(qs, chunksize=self.index_by):
+                try:
                     actions = [
                         {'_index': index,
                          '_type': doc_type,
@@ -300,10 +300,9 @@ class Search(FieldMappingMixin):
                     ]
                     responses.append(bulk(client=es, actions=tuple(actions)))
                     es.indices.refresh(index=index)
-            except BulkIndexError as e:
-                logger.error("Failure during bulk index: {}".format(six.text_type(e)))
-            else:
-                return responses
+                except BulkIndexError as e:
+                    logger.error("Failure during bulk index: {}".format(six.text_type(e)))
+            return responses
         except AssertionError:
             if not qs.count():
                 logger.info("No objects to index")
@@ -352,8 +351,8 @@ class Search(FieldMappingMixin):
             assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
 
             responses = []
-            try:
-                for chunk in queryset_iterator(qs, chunksize=self.index_by):
+            for chunk in queryset_iterator(qs, chunksize=self.index_by):
+                try:
                     actions = [
                         {'_index': index,
                          '_type': doc_type,
@@ -363,10 +362,9 @@ class Search(FieldMappingMixin):
                     ]
                     logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
                     responses.append(bulk(client=es, actions=tuple(actions)))
-            except BulkIndexError as e:
-                logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
-            else:
-                return responses
+                except BulkIndexError as e:
+                    logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
+            return responses
         except AssertionError:
             if not qs.count():
                 logger.info("No objects to prune")
