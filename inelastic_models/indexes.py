@@ -114,8 +114,8 @@ class Search(FieldMappingMixin):
             return "{}_{}".format(self.model._meta.app_label, self.model._meta.model_name)
 
     def get_dependencies(self):
-        dependencies = self.dependencies
-        for model, query in dependencies.items():
+        dependencies = self.dependencies.copy()
+        for model, query in self.dependencies.items():
             if isinstance(model, six.text_type):
                 (app_name, model_name) = model.split('.')
                 model_cls = apps.get_model(app_name, model_name)
