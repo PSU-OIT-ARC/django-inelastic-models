@@ -1,7 +1,10 @@
 import sys
+import os
 
 from django.conf import settings
 from django import VERSION
+
+ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST', 'http://elasticsearch:9200')
 
 
 settings.configure(
@@ -24,7 +27,7 @@ settings.configure(
     MIDDLEWARE_CLASSES=[],
     ELASTICSEARCH_CONNECTIONS={
         'default': {
-            'HOSTS': ['http://elasticsearch:9200'],
+            'HOSTS': [ELASTICSEARCH_HOST],
             'INDEX_NAME': 'inelastic_models',
         }
     },

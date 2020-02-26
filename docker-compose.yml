@@ -8,11 +8,12 @@ services:
     image: elasticsearch:2
     networks:
       - default
+    ports:
+      - "127.0.0.1:9200:9200"
 
   test:
     build:
       context: .
-    command: make test
     networks:
       - default
     volumes:
