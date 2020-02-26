@@ -37,10 +37,7 @@ def queryset_iterator(queryset, chunksize=CHUNKSIZE):
 
     Taken from: http://djangosnippets.org/snippets/1949/
     """
-    logger.info("Using chunk size {}".format(chunksize))
-
-    if not queryset.exists():
-        return queryset.none()
+    assert queryset.exists(), "Can't iterate over empty queryset"
 
     ordering = queryset.model._meta.pk.get_attname()
     pk = getattr(queryset.order_by('-{}'.format(ordering))[0], ordering) + 1
@@ -289,8 +286,9 @@ class Search(FieldMappingMixin):
         es = self.get_es()
 
         try:
-            responses = []
+            assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
 
+            responses = []
             try:
                 for chunk in queryset_iterator(qs, chunksize=self.index_by):
                     actions = [
@@ -307,6 +305,10 @@ class Search(FieldMappingMixin):
             else:
                 return responses
         except AssertionError:
+            if not qs.count():
+                logger.info("No objects to index")
+                return None
+
             try:
                 actions = [
                     {'_index': index,
@@ -345,8 +347,9 @@ class Search(FieldMappingMixin):
         qs = self.model.objects.exclude(id__in=self.get_qs())
 
         try:
-            responses = []
+            assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
 
+            responses = []
             try:
                 for chunk in queryset_iterator(qs, chunksize=self.index_by):
                     actions = [
@@ -363,6 +366,10 @@ class Search(FieldMappingMixin):
             else:
                 return responses
         except AssertionError:
+            if not qs.count():
+                logger.info("No objects to prune")
+                return None
+
             try:
                 actions = [
                     {'_index': index,
