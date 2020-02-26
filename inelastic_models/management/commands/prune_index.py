@@ -12,8 +12,8 @@ class Command(IndexCommand):
     """
     TBD
     """
-    help = 'Updates the search index to synchronize it with the corresponding data model store.'
+    help = 'Prunes the search index to synchronize it with the corresponding data model store.'
 
     def handle_operation(self, search, queryset):
-        logger.info("Indexing {} {} objects".format(queryset.count(), search.model.__name__))
-        search.index_qs(queryset)
+        logger.info("Pruning {} objects".format(search.model.__name__))
+        search.bulk_prune()

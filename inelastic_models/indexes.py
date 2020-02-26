@@ -344,8 +344,8 @@ class Search(FieldMappingMixin):
         index = self.get_index()
         es = self.get_es()
 
-        pks = self.model.objects.difference(self.get_qs()).values_list('pk', flat=True)
-        qs = self.model.objects.filter(pk__in=pks)
+        pruned = self.model.objects.difference(self.get_qs())
+        qs = self.model.objects.filter(pk__in=pruned.values_list('pk', flat=True))
 
         try:
             assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
