@@ -41,7 +41,7 @@ class ModelSearch(Search):
     attribute_fields = ['name', 'date', 'email', 'count_m2m']
     other_fields = {
         'test_ngram': NGramField('name'),
-        'test_email': StringField('email', index='not_analyzed')
+        'test_email': StringField('email', index=False)
     }
 
     def get_base_qs(self):

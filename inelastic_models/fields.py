@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 class SearchField(object):
     mapping = None
-    mapping_type = 'string'
-    index = None #Set to 'analyzed' 'not_analyzed' or 'no'
+    mapping_type = 'text'
+    index = True
 
     def __init__(self, *args, **kwargs):
         if 'index' in kwargs:
@@ -38,9 +38,9 @@ class SearchField(object):
             return self.mapping
 
         mapping = {'type': self.mapping_type}
-        if self.index is not None:
-            mapping['index'] = self.index
         (a_name, _) = self.get_analyzer()
+        if self.index is False:
+            mapping['index'] = False
         if a_name is not None:
             mapping['analyzer'] = a_name
 
@@ -304,6 +304,7 @@ class ObjectField(FieldMappingMixin, AttributeField):
 class MultiObjectField(FieldMappingMixin, MultiField):
     """ a list of dictionaries """
     mapping_type = 'nested'
+    index = None
 
     def get_field_mapping(self):
         mapping = super(MultiObjectField, self).get_field_mapping()

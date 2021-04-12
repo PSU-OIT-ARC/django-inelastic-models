@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import datetime
 
+import elasticsearch.exceptions
 from django_dynamic_fixture import G
 from django import test
 
@@ -79,13 +80,12 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
         query = Model.search.query('match', email='test1@example.com')
         self.assertEqual(len(query.execute().hits), 2)
 
-    def test_string_not_analyzed(self):
+    def test_string_not_indexed(self):
         mapping = Model._search_meta().get_mapping()
-        self.assertEqual(mapping['properties']['test_email']['index'],
-                         'not_analyzed')
+        self.assertFalse(mapping['properties']['test_email']['index'])
 
-        # This field not analyzed:
-        #   results will not contain records which share substrings
-        #   (e.g., domain)
-        query = Model.search.query('match', test_email='test1@example.com')
-        self.assertEqual(len(query.execute().hits), 1)
+        # This field is not indexed:
+        #   field will not be queryable.
+        with self.assertRaises(elasticsearch.exceptions.TransportError):
+            query = Model.search.query('match', test_email='test1@example.com')
+            query.execute()
