@@ -8,6 +8,8 @@ import six
 from contextlib import contextmanager
 from datetime import timedelta
 
+import elasticsearch.exceptions
+
 from django.utils.lru_cache import lru_cache
 from django.utils.timezone import now
 from django.core.cache import caches
@@ -66,13 +68,27 @@ def update_search_index(sender, **kwargs):
         logger.debug("Skipping indexing for '%s'" % (sender))
         return
 
-    instance.index()
-
+    try:
+        instance.index()
+    except elasticsearch.exceptions.ConnectionTimeout as exc:
+        msg = "Index request for '{}' timed-out."
+        logger.warning(mgs.format(instance))
+    except elasticsearch.exceptions.ConnectionError as exc:
+        msg = "Index request for '{}' encountered a connection error."
+        logger.warning(msg.format(instance))
+    
     dependents = merge([instance._search_dependents, get_dependents(instance)])
     for model, qs in six.iteritems(dependents):
         search_meta = model._search_meta()
         for record in qs.iterator():
-            search_meta.index_instance(record)
+            try:
+                search_meta.index_instance(record)
+            except elasticsearch.exceptions.ConnectionTimeout as exc:
+                msg = "Index request for '{}' timed out."
+                logger.warning(msg.format(record))
+            except elasticsearch.exceptions.ConnectionError as exc:
+                msg = "Index request for '{}' encountered a connection error."
+                logger.warning(msg.format(record))
 
 @receiver(signals.m2m_changed)
 def handle_m2m(sender, **kwargs):
