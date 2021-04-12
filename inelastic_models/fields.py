@@ -27,6 +27,12 @@ class SearchField(object):
 
         super(SearchField, self).__init__(*args, **kwargs)
 
+    def get_analyzer(self):
+        return (None, {})
+
+    def get_tokenizer(self):
+        return (None, {})
+
     def get_field_mapping(self):
         if self.mapping is not None:
             return self.mapping
@@ -34,11 +40,25 @@ class SearchField(object):
         mapping = {'type': self.mapping_type}
         if self.index is not None:
             mapping['index'] = self.index
+        (a_name, _) = self.get_analyzer()
+        if a_name is not None:
+            mapping['analyzer'] = a_name
 
         return mapping
 
     def get_field_settings(self):
-        return {}
+        settings = {}
+
+        (t_name, t_def) = self.get_tokenizer()
+        (a_name, a_def) = self.get_analyzer()
+        if t_def:
+            settings['tokenizer'] = dict([(t_name, t_def)])
+        if a_def:
+            settings['analyzer'] = dict([(a_name, a_def)])
+
+        if not settings:
+            return settings
+        return {'analysis': settings}
 
     def get_from_instance(self, instance):
         return None
@@ -136,39 +156,18 @@ class NGramField(StringField):
 
         super(NGramField, self).__init__(*args, **kwargs)
 
-    def get_analyzer_name(self):
-        return "ngram_analyzer_%d_%d" % (self.min_gram, self.max_gram)
+    def get_tokenizer(self):
+        name = "ngram_tokenizer_%d_%d" % (self.min_gram, self.max_gram)
+        return (name, {'type': 'nGram',
+                       'min_gram': self.min_gram,
+                       'max_gram': self.max_gram,
+                       'token_chars': ["letter", "digit"]})
 
-    def get_field_mapping(self):
-        mapping = super(NGramField, self).get_field_mapping()
-        mapping['analyzer'] = self.get_analyzer_name()
-        return mapping
+    def get_analyzer(self):
+        (t_name, _) = self.get_tokenizer()
+        name = "ngram_analyzer_{}_{}".format(self.min_gram, self.max_gram)
+        return (name, {'tokenizer': t_name, 'filter': ['lowercase']})
 
-    def get_field_settings(self):
-        settings = super(NGramField, self).get_field_settings()
-        analyzer_name = self.get_analyzer_name()
-        tokenizer_name = "ngram_tokenizer_%d_%d" % (self.min_gram, self.max_gram)
-
-        settings = merge([settings, {
-            'analysis': {
-                'analyzer': {
-                    analyzer_name: {
-                        'tokenizer': tokenizer_name,
-                        'filter': ['lowercase'],
-                    }
-                },
-                'tokenizer': {
-                    tokenizer_name : {
-                        'type': 'nGram',
-                        'min_gram': self.min_gram,
-                        'max_gram': self.max_gram,
-                        'token_chars': [ "letter", "digit" ]
-                    }
-                },
-            }
-        }])
-
-        return settings
 
 class MultiField(AttributeField):
     def get_from_instance(self, instance):
