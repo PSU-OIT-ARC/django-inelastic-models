@@ -75,12 +75,17 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
         self.assertIn('Test1', hit_names)
         self.assertIn('Test2', hit_names)
 
-    def test_email_not_analyzed(self):
+    def test_string_analyzed(self):
+        query = Model.search.query('match', email='test1@example.com')
+        self.assertEqual(len(query.execute().hits), 2)
+
+    def test_string_not_analyzed(self):
         mapping = Model._search_meta().get_mapping()
-        self.assertEqual(mapping['properties']['email']['index'],
+        self.assertEqual(mapping['properties']['test_email']['index'],
                          'not_analyzed')
 
-        # email fields not analyzed: results will not contain records
-        # which share substrings (e.g., domain)
-        query = Model.search.query('match', email='test1@example.com')
+        # This field not analyzed:
+        #   results will not contain records which share substrings
+        #   (e.g., domain)
+        query = Model.search.query('match', test_email='test1@example.com')
         self.assertEqual(len(query.execute().hits), 1)

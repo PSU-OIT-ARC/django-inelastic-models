@@ -7,7 +7,8 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.db import models
 
 from ..indexes import SearchMixin, Search
-from ..fields import NGramField, ListField, ObjectField, MultiObjectField
+from ..fields import (ListField, StringField, NGramField,
+                      ObjectField, MultiObjectField)
 
 TEST_MODEL_EXCLUDE_NAME = 'NO'
 
@@ -40,6 +41,7 @@ class ModelSearch(Search):
     attribute_fields = ['name', 'date', 'email', 'count_m2m']
     other_fields = {
         'test_ngram': NGramField('name'),
+        'test_email': StringField('email', index='not_analyzed')
     }
 
     def get_base_qs(self):
