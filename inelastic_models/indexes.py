@@ -156,7 +156,6 @@ class Search(FieldMappingMixin):
         es.indices.create(index)
         es.indices.refresh(index=index)
         es.cluster.health(wait_for_status='yellow')
-        es.indices.flush(wait_if_ongoing=True)
 
     def configure_index(self):
         """
@@ -182,7 +181,6 @@ class Search(FieldMappingMixin):
             es.indices.open(index)
             es.indices.put_settings(replica_settings, index)
             es.indices.refresh(index=index)
-            es.indices.flush(wait_if_ongoing=True)
 
             if len(index_settings):
                 config.update(index_settings)
@@ -200,7 +198,6 @@ class Search(FieldMappingMixin):
         finally:
             es.indices.open(index)
             es.indices.refresh(index=index)
-            es.indices.flush(wait_if_ongoing=True)
 
     def check_mapping(self):
         doc_type = self.get_doc_type()
