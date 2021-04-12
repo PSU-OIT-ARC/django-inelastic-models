@@ -58,7 +58,7 @@ def queryset_iterator(queryset, chunksize=CHUNKSIZE):
     logger.info("Iterated {} records".format(total))
 
 
-class AwareResult(dsl.result.Result):
+class AwareResult(dsl.response.Hit):
     def __init__(self, document, search_meta):
         super(AwareResult, self).__init__(document)
         for name, field in search_meta.get_fields().items():
