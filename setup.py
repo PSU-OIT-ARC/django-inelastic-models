@@ -10,9 +10,9 @@ setup(
     long_description=open('README.rst').read(),
 
     packages=find_packages(),
-    install_requires=['elasticsearch>=2.0.0,<5.0.0',
-                      'elasticsearch-dsl>=2.0.0,<5.0.0',
-                      'django>1.11,<3.0'],
+    install_requires=['elasticsearch~=7.0',
+                      'elasticsearch-dsl~=7.0',
+                      'django>2.2,<3.0'],
     extras_require={
         'test': ['django-dynamic-fixture',
                  'docker-compose']

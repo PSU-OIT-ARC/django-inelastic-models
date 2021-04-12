@@ -29,6 +29,9 @@ settings.configure(
         'default': {
             'HOSTS': [ELASTICSEARCH_HOST],
             'INDEX_NAME': 'inelastic_models',
+            'INDEX_OPTIONS': {
+                'max_ngram_diff': 2
+            }
         }
     },
     TEMPLATES=[{

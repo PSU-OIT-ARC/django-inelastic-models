@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import dateutil
 import logging
+import copy
 import six
 
 from django.template.loader import render_to_string
@@ -268,13 +269,13 @@ class FieldMappingMixin(object):
 
     def get_index_settings(self):
         connection_info = settings.ELASTICSEARCH_CONNECTIONS[self.connection]
-        config = connection_info.get('INDEX_OPTIONS', {})
-        logger.debug("Using configuration: %s" % (config))
+        options = copy.deepcopy(connection_info.get('INDEX_OPTIONS', {}))
 
-        if not config:
-            return {'index': {}}
-        return {'index': {
-            'number_of_replicas': config.get('number_of_replicas', 1)}}
+        if options.get('number_of_replicas', None) is None:
+            options.update({'number_of_replicas': 1})
+
+        logger.debug("Using index configuration: {}".format(options))
+        return {'index': options}
 
     def get_settings(self):
         return merge([f.get_field_settings() for f in self.get_fields().values()])

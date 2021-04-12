@@ -179,7 +179,7 @@ class Search(FieldMappingMixin):
                 }
             }
             es.indices.open(index)
-            es.indices.put_settings(replica_settings, index)
+            es.indices.put_settings(replica_settings, index=index)
             es.indices.refresh(index=index)
 
             if len(index_settings):
@@ -190,7 +190,7 @@ class Search(FieldMappingMixin):
         try:
             es.indices.close(index)
             logger.debug("Updating settings for index '{}': {}".format(index, settings))
-            es.indices.put_settings(settings, index)
+            es.indices.put_settings(settings, index=index)
         except exceptions.RequestError as e:
             if settings:
                 raise e
@@ -219,10 +219,13 @@ class Search(FieldMappingMixin):
                                         rhs[name]['properties'])
             return True
 
-        installed_mapping = es.indices.get_mapping(index=index, doc_type=doc_type) \
-            .get(index).get('mappings').get(doc_type)
+        installed_mapping = es.indices.get_mapping(doc_type=doc_type,
+                                                   index=index,
+                                                   include_type_name=True)
+        document = installed_mapping.get(index).get('mappings').get(doc_type)
+
         return validate_properties(mapping.get('properties'),
-                                   installed_mapping.get('properties'))
+                                   document.get('properties'))
 
     def put_mapping(self):
         """
@@ -238,7 +241,10 @@ class Search(FieldMappingMixin):
 
         log_msg = "Updating mapping for index '{}' and doc type '{}': {}"
         logger.debug(log_msg.format(index, doc_type, mapping))
-        es.indices.put_mapping(doc_type, mapping, index=index)
+        es.indices.put_mapping(mapping,
+                               doc_type=doc_type,
+                               index=index,
+                               include_type_name=True)
 
     def get_base_qs(self):
         # Some objects have a default ordering, which only slows
