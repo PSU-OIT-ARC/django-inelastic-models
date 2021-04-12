@@ -44,11 +44,7 @@ settings.configure(
     }]
 )
 
-if VERSION[:2] >= (1, 7):
-    from django import setup
-else:
-    setup = lambda: None
-
+from django import setup
 setup()
 
 
