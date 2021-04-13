@@ -199,7 +199,8 @@ class DateField(AttributeField):
     def to_python(self, value):
         if isinstance(value, str):
             return dateutil.parser.parse(value).date()
-        return value
+
+        return super().to_python(value)
 
 
 class FieldMappingMixin(object):

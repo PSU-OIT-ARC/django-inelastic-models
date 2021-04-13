@@ -57,6 +57,7 @@ def queryset_iterator(queryset, chunksize=CHUNKSIZE):
 class AwareResult(dsl.response.Hit):
     def __init__(self, document, search_meta):
         super().__init__(document)
+
         for name, field in search_meta.get_fields().items():
             self[name] = field.to_python(self[name])
 
@@ -68,7 +69,6 @@ class AwareResult(dsl.response.Hit):
 
 
 class Search(FieldMappingMixin):
-    doc_type = None
     connection = 'default'
     mapping = None
     index_by = CHUNKSIZE
@@ -99,15 +99,11 @@ class Search(FieldMappingMixin):
         return mapping
 
     def get_index(self):
-        return '{}--{}'.format(
-            settings.ELASTICSEARCH_CONNECTIONS[self.connection]['INDEX_NAME'],
-            self.get_doc_type())
+        index_name = settings.ELASTICSEARCH_CONNECTIONS[self.connection]['INDEX_NAME']
+        return '{}--{}'.format(index_name, self.get_doc_type())
 
     def get_doc_type(self):
-        if self.doc_type is not None:
-            return self.doc_type
-        else:
-            return "{}_{}".format(self.model._meta.app_label, self.model._meta.model_name)
+        return "{}_{}".format(self.model._meta.app_label, self.model._meta.model_name)
 
     def get_dependencies(self):
         dependencies = self.dependencies.copy()
@@ -133,14 +129,12 @@ class Search(FieldMappingMixin):
     def get_search(self):
         s = dsl.Search(using=self.get_es())
         s = s.index(self.get_index())
-        s = s.doc_type(**{self.get_doc_type(): AwareResult.make_callback(self)})
-        return s
+        return s.doc_type(**{'_doc': AwareResult.make_callback(self)})
 
     def create_index(self):
         """
         Creates an index and removes any previously-installed index mapping.
         """
-        doc_type = self.get_doc_type()
         index = self.get_index()
         es = self.get_es()
 
@@ -196,7 +190,6 @@ class Search(FieldMappingMixin):
             es.indices.refresh(index=index)
 
     def check_mapping(self):
-        doc_type = self.get_doc_type()
         mapping = self.get_mapping()
         index = self.get_index()
         es = self.get_es()
@@ -215,11 +208,8 @@ class Search(FieldMappingMixin):
                                         rhs[name]['properties'])
             return True
 
-        installed_mapping = es.indices.get_mapping(doc_type=doc_type,
-                                                   index=index,
-                                                   include_type_name=True)
-        document = installed_mapping.get(index).get('mappings').get(doc_type)
-
+        active_mapping = es.indices.get_mapping(index=index)
+        document = active_mapping.get(index).get('mappings')
         return validate_properties(mapping.get('properties'),
                                    document.get('properties'))
 
@@ -230,17 +220,14 @@ class Search(FieldMappingMixin):
         self.create_index()
         self.configure_index()
 
-        doc_type = self.get_doc_type()
         mapping = self.get_mapping()
         index = self.get_index()
         es = self.get_es()
 
-        log_msg = "Updating mapping for index '{}' and doc type '{}': {}"
-        logger.debug(log_msg.format(index, doc_type, mapping))
+        log_msg = "Updating mapping for index '{}': {}"
+        logger.debug(log_msg.format(index, mapping))
         es.indices.put_mapping(mapping,
-                               doc_type=doc_type,
-                               index=index,
-                               include_type_name=True)
+                               index=index)
 
     def get_base_qs(self):
         # Some objects have a default ordering, which only slows
@@ -268,19 +255,21 @@ class Search(FieldMappingMixin):
             logger.debug("Indexing instance '{}'".format(instance))
             self.get_es().index(
                 index=self.get_index(),
-                doc_type=self.get_doc_type(),
                 id=instance.pk,
                 body=self.prepare(instance))
         else:
-            logger.debug("Un-indexing instance '{}'".format(instance))
-            self.get_es().delete(
-                index=self.get_index(),
-                doc_type=self.get_doc_type(),
-                id=instance.pk,
-                ignore=404)
+            try:
+                instance.refresh_from_db()
+                logger.debug("Un-indexing instance '{}'".format(instance))
+            except:
+                logger.debug("Un-indexing instance '{}'".format(instance.pk))
+            finally:
+                self.get_es().delete(
+                    index=self.get_index(),
+                    id=instance.pk,
+                    ignore=404)
 
     def index_qs(self, qs):
-        doc_type = self.get_doc_type()
         index = self.get_index()
         es = self.get_es()
 
@@ -292,7 +281,6 @@ class Search(FieldMappingMixin):
                 try:
                     actions = [
                         {'_index': index,
-                         '_type': doc_type,
                          '_id': instance.pk,
                          '_source': self.prepare(instance)}
                         for instance in chunk.iterator()
@@ -310,7 +298,6 @@ class Search(FieldMappingMixin):
             try:
                 actions = [
                     {'_index': index,
-                     '_type': doc_type,
                      '_id': instance.pk,
                      '_source': self.prepare(instance)}
                     for instance in qs.iterator()
@@ -322,13 +309,11 @@ class Search(FieldMappingMixin):
                 logger.error("Failure during bulk index: {}".format(e))
 
     def bulk_clear(self):
-        doc_type = self.get_doc_type()
         index = self.get_index()
         es = self.get_es()
 
         try:
             actions = [{'_index': index,
-                        '_type': doc_type,
                         '_op_type' : 'delete',
                         '_id': hit.pk}
                        for hit in self.get_search()]
@@ -339,7 +324,6 @@ class Search(FieldMappingMixin):
             logger.error("Failure during bulk clear: {}".format(e))
 
     def bulk_prune(self):
-        doc_type = self.get_doc_type()
         index = self.get_index()
         es = self.get_es()
 
@@ -354,7 +338,6 @@ class Search(FieldMappingMixin):
                 try:
                     actions = [
                         {'_index': index,
-                         '_type': doc_type,
                          '_op_type' : 'delete',
                          '_id': instance.pk}
                         for instance in chunk.iterator()
@@ -372,7 +355,6 @@ class Search(FieldMappingMixin):
             try:
                 actions = [
                     {'_index': index,
-                     '_type': doc_type,
                      '_id': instance.pk,
                      '_source': self.prepare(instance)}
                     for instance in qs.iterator()
