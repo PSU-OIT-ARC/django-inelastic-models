@@ -160,7 +160,7 @@ class NGramField(StringField):
 
     def get_tokenizer(self):
         name = "ngram_tokenizer_%d_%d" % (self.min_gram, self.max_gram)
-        return (name, {'type': 'nGram',
+        return (name, {'type': 'ngram',
                        'min_gram': self.min_gram,
                        'max_gram': self.max_gram,
                        'token_chars': ["letter", "digit"]})
