@@ -1,8 +1,4 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 from datetime import datetime, timedelta
-import six
 import re
 
 from django.core.management.base import BaseCommand, CommandError
@@ -18,7 +14,7 @@ DURATION_RE = re.compile(
 
 class IndexCommand(BaseCommand):
     def add_arguments(self, parser):
-        parser.add_argument('args', nargs='*', type=six.text_type)
+        parser.add_argument('args', nargs='*', type=str)
         parser.add_argument('--since', action="store", default='', dest='since',
                             help='Index data updated after this time.  yyyy-mm-dd[-hh:mm] or [#d][#h][#m][#s]')
         parser.add_argument('--until', action="store", default='', dest='until',

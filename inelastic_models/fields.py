@@ -1,10 +1,6 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import dateutil
 import logging
 import copy
-import six
 
 from django.template.loader import render_to_string
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -26,7 +22,7 @@ class SearchField(object):
         if 'index' in kwargs:
             self.index = kwargs.pop('index')
 
-        super(SearchField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_analyzer(self):
         return (None, {})
@@ -64,18 +60,20 @@ class SearchField(object):
     def get_from_instance(self, instance):
         return None
 
+
 class TemplateField(SearchField):
     def __init__(self, template_name):
         self.template_name = template_name
-        super(TemplateField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_from_instance(self, instance):
         context = {'object': self.instance}
         return render_to_string(template_name, context)
 
+
 class EmailURLAllField(SearchField):
     def get_field_settings(self):
-        settings = super(EmailURLAllField, self).get_field_settings()
+        settings = super().get_field_settings()
         settings = merge([settings, {
             'analysis': {
                 'analyzer': {
@@ -95,14 +93,15 @@ class EmailURLAllField(SearchField):
         return settings
 
     def get_field_mapping(self):
-        mapping = super(EmailURLAllField, self).get_field_mapping()
+        mapping = super().get_field_mapping()
         mapping['analyzer'] = 'email_url_analyzer'
         return mapping
+
 
 class AttributeField(SearchField):
     def __init__(self, attr, *args, **kwargs):
         self.path = attr.split(".")
-        super(AttributeField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_from_instance(self, instance):
         for attr in self.path:
@@ -125,20 +124,22 @@ class AttributeField(SearchField):
     def to_python(self, value):
         return value
 
+
 class StringField(AttributeField):
     def get_from_instance(self, instance):
-        value = super(StringField, self).get_from_instance(instance)
+        value = super().get_from_instance(instance)
         if value is not None and callable(value):
             value = value()
-        return six.text_type(value) or ""
+        return str(value) or ""
+
 
 class TranslationField(StringField):
     def __init__(self, attr, *args, **kwargs):
         self.language_name = kwargs.pop('language', None)
-        super(TranslationField, self).__init__(attr, *args, **kwargs)
+        super().__init__(attr, *args, **kwargs)
 
     def get_field_mapping(self):
-        mapping = super(TranslationField, self).get_field_mapping()
+        mapping = super().get_field_mapping()
         if self.language_name is not None:
             mapping['analyzer'] = self.language_name
         return mapping
@@ -155,7 +156,7 @@ class NGramField(StringField):
         if 'max_gram' in kwargs:
             self.max_gram = kwargs.pop('max_gram')
 
-        super(NGramField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_tokenizer(self):
         name = "ngram_tokenizer_%d_%d" % (self.min_gram, self.max_gram)
@@ -172,29 +173,34 @@ class NGramField(StringField):
 
 class MultiField(AttributeField):
     def get_from_instance(self, instance):
-        manager = super(MultiField, self).get_from_instance(instance)
+        manager = super().get_from_instance(instance)
         return self.render(manager)
 
     def render(self, manager):
-        return "\n".join(six.text_type(i) for i in manager.all())
+        return "\n".join(str(i) for i in manager.all())
+
 
 class ListField(MultiField):
     def render(self, manager):
-        return list(six.text_type(i) for i in manager.all())
+        return list(str(i) for i in manager.all())
+
 
 class IntegerField(AttributeField):
     mapping_type = 'integer'
 
+
 class BooleanField(AttributeField):
     mapping_type = 'boolean'
+
 
 class DateField(AttributeField):
     mapping_type = 'date'
 
     def to_python(self, value):
-        if isinstance(value, six.text_type):
+        if isinstance(value, str):
             return dateutil.parser.parse(value).date()
         return value
+
 
 class FieldMappingMixin(object):
     attribute_fields = ()
@@ -214,7 +220,7 @@ class FieldMappingMixin(object):
         if 'other_fields' in kwargs:
             self.other_fields = kwargs.pop('other_fields')
 
-        super(FieldMappingMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_attr_field(self, attr):
         # Figure out if the attribute is a model field, and if so, use it to
@@ -290,17 +296,19 @@ class FieldMappingMixin(object):
         return dict((name, field.get_from_instance(instance))
                     for name, field in list(self.get_fields().items()))
 
+
 class ObjectField(FieldMappingMixin, AttributeField):
     mapping_type = 'object'
 
     def get_field_mapping(self):
-        mapping = super(ObjectField, self).get_field_mapping()
+        mapping = super().get_field_mapping()
         mapping.update(self.get_mapping())
         return mapping
 
     def get_from_instance(self, instance):
-        instance = super(ObjectField, self).get_from_instance(instance)
+        instance = super().get_from_instance(instance)
         return self.prepare(instance)
+
 
 class MultiObjectField(FieldMappingMixin, MultiField):
     """ a list of dictionaries """
@@ -308,7 +316,7 @@ class MultiObjectField(FieldMappingMixin, MultiField):
     index = None
 
     def get_field_mapping(self):
-        mapping = super(MultiObjectField, self).get_field_mapping()
+        mapping = super().get_field_mapping()
         mapping.update(self.get_mapping())
         return mapping
 

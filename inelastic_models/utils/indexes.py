@@ -1,10 +1,9 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import logging
 
 from elasticsearch import Elasticsearch
+
 from django.conf import settings
+
 from ..receivers import get_search_models
 
 logger = logging.getLogger(__name__)

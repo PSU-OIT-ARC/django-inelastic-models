@@ -1,9 +1,7 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import datetime
 
 import elasticsearch.exceptions
+
 from django_dynamic_fixture import G
 from django import test
 
@@ -18,7 +16,7 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
     Validates behavior of 'search.SearchField' and derived types.
     """
     def setUp(self):
-        super(SearchFieldTestCase, self).setUp()
+        super().setUp()
 
         tm = self.create_instance(name='Test1',
                                   date=datetime.date(2015, 1, 1),

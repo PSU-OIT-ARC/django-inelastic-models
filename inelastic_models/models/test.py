@@ -1,9 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
-import six
-
-from django.utils.encoding import python_2_unicode_compatible
 from django.db import models
 
 from ..indexes import SearchMixin, Search
@@ -13,7 +7,6 @@ from ..fields import (ListField, StringField, NGramField,
 TEST_MODEL_EXCLUDE_NAME = 'NO'
 
 
-@python_2_unicode_compatible
 class Model(SearchMixin, models.Model):
     name = models.CharField(max_length=256)
     modified_on = models.DateTimeField(auto_now=True)
@@ -29,13 +22,14 @@ class Model(SearchMixin, models.Model):
 
     @property
     def count_m2m(self):
-        return six.text_type(self.test_m2m.count())
+        return str(self.test_m2m.count())
 
     def __str__(self):
         return self.name
 
     class Meta:
         app_label = 'inelastic_models'
+
 
 class ModelSearch(Search):
     attribute_fields = ['name', 'date', 'email', 'count_m2m']
@@ -49,7 +43,7 @@ class ModelSearch(Search):
 
 ModelSearch.bind_to_model(Model)
 
-@python_2_unicode_compatible
+
 class SearchFieldModel(SearchMixin, models.Model):
     modified_on = models.DateTimeField(auto_now=True)
     related = models.ForeignKey('inelastic_models.Model',
@@ -57,10 +51,11 @@ class SearchFieldModel(SearchMixin, models.Model):
                                 null=True, blank=True)
 
     def __str__(self):
-        return six.text_type("Related: %s" % (self.related))
+        return "Related: {}".format(self.related)
 
     class Meta:
         app_label = 'inelastic_models'
+
 
 class SearchFieldModelSearch(Search):
     other_fields = {

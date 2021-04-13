@@ -1,9 +1,5 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import threading
 import logging
-import six
 
 from contextlib import contextmanager
 from datetime import timedelta
@@ -29,6 +25,7 @@ suspended_models = []
 def get_search_models():
     return [m for m in apps.get_models() if issubclass(m, SearchMixin)]
 
+
 def _is_suspended(model):
     global suspended_models
 
@@ -37,6 +34,7 @@ def _is_suspended(model):
             return True
 
     return False
+
 
 def get_dependents(instance):
     dependents = {}
@@ -50,11 +48,13 @@ def get_dependents(instance):
 
     return dependents
 
+
 @receiver(signals.pre_save)
 @receiver(signals.pre_delete)
 def collect_dependents(sender, **kwargs):
     instance = kwargs['instance']
     instance._search_dependents = get_dependents(instance)
+
 
 @receiver(signals.post_delete)
 @receiver(signals.post_save)
@@ -78,7 +78,7 @@ def update_search_index(sender, **kwargs):
         logger.warning(msg.format(instance))
     
     dependents = merge([instance._search_dependents, get_dependents(instance)])
-    for model, qs in six.iteritems(dependents):
+    for model, qs in dependents.items():
         search_meta = model._search_meta()
         for record in qs.iterator():
             try:
@@ -90,12 +90,14 @@ def update_search_index(sender, **kwargs):
                 msg = "Index request for '{}' encountered a connection error."
                 logger.warning(msg.format(record))
 
+
 @receiver(signals.m2m_changed)
 def handle_m2m(sender, **kwargs):
     if kwargs['action'].startswith("pre_"):
         collect_dependents(kwargs['model'], **kwargs)
     else:
         update_search_index(kwargs['model'], **kwargs)
+
 
 @contextmanager
 def suspended_updates(models=None, permanent=False):

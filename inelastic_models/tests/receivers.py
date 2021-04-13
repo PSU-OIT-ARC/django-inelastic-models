@@ -1,6 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 from django_dynamic_fixture import G
 from django.db import transaction
 from django import test
@@ -17,7 +14,7 @@ class SearchPostSaveTestCase(SearchBaseTestCase, test.TestCase):
     TBD
     """
     def setUp(self):
-        super(SearchPostSaveTestCase, self).setUp()
+        super().setUp()
 
         self.assertIn(Model, get_search_models())
 

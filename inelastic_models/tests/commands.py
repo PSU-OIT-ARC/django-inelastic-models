@@ -1,9 +1,6 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import datetime
 import logging
-import six
+import io
 
 from django_dynamic_fixture import G
 from django.core.management import call_command
@@ -37,7 +34,7 @@ class CommandTestCaseMixin(SearchBaseTestCase):
 
         (args, kwargs) = self.get_command_args()
         logger.info("Executing command: '%s' '%s'" % (args, kwargs))
-        response_buffer = six.StringIO()
+        response_buffer = io.StringIO()
         error = None
 
         try:
@@ -51,11 +48,12 @@ class CommandTestCaseMixin(SearchBaseTestCase):
         response = response_buffer.getvalue().strip()
         self.check_command_response(response, error=error)
 
+
 class SearchCommandTestCase(CommandTestCaseMixin):
     update_limit = 100
 
     def setUp(self):
-        super(SearchCommandTestCase, self).setUp()
+        super().setUp()
 
         with suspended_updates(models=[Model], permanent=True):
             self.instance = G(Model, name='Test1')
@@ -71,39 +69,41 @@ class SearchCommandTestCase(CommandTestCaseMixin):
 
         return (args, kwargs)
 
+
 class CreateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
     command_name = 'create_index'
 
     def check_command_response(self, response, **kwargs):
-        super(SearchCommandTestCase, self).check_command_response(
+        super().check_command_response(
             response, **kwargs)
 
         refresh_search_indexes()
         self.assertEqual(Model.search.count(), 1)
 
+
 class UpdateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
     command_name = 'update_index'
 
     def check_command_response(self, response, **kwargs):
-        super(SearchCommandTestCase, self).check_command_response(
+        super().check_command_response(
             response, **kwargs)
 
         G(Model, name='Test2')
         refresh_search_indexes()
         self.assertEqual(Model.search.count(), 2)
 
+
 class MigrateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
     command_name = 'migrate_index'
 
     def setUp(self):
-        super(MigrateIndexCommandTestCase, self).setUp()
+        super().setUp()
 
         G(Model, name='Test2', non_indexed_field='Hack the Gibson.')
         ModelSearch.attribute_fields.append('non_indexed_field')
 
     def check_command_response(self, response, **kwargs):
-        super(SearchCommandTestCase, self).check_command_response(
-            response, **kwargs)
+        super().check_command_response(response, **kwargs)
 
         refresh_search_indexes()
         self.assertEqual(Model.search.query('match', test_ngram='Test').count(), 2)

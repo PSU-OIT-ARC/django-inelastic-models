@@ -1,9 +1,5 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import threading
 import logging
-import six
 import gc
 
 from elasticsearch.helpers import bulk, BulkIndexError
@@ -60,7 +56,7 @@ def queryset_iterator(queryset, chunksize=CHUNKSIZE):
 
 class AwareResult(dsl.response.Hit):
     def __init__(self, document, search_meta):
-        super(AwareResult, self).__init__(document)
+        super().__init__(document)
         for name, field in search_meta.get_fields().items():
             self[name] = field.to_python(self[name])
 
@@ -93,12 +89,12 @@ class Search(FieldMappingMixin):
     dependencies = {}
 
     def get_settings(self):
-        settings = super(Search, self).get_settings()
+        settings = super().get_settings()
         settings = merge([settings, self.all_field.get_field_settings()])
         return settings
 
     def get_mapping(self):
-        mapping = super(Search, self).get_mapping()
+        mapping = super().get_mapping()
         mapping['_all'] = self.all_field.get_field_mapping()
         return mapping
 
@@ -116,7 +112,7 @@ class Search(FieldMappingMixin):
     def get_dependencies(self):
         dependencies = self.dependencies.copy()
         for model, query in self.dependencies.items():
-            if isinstance(model, six.text_type):
+            if isinstance(model, str):
                 (app_name, model_name) = model.split('.')
                 model_cls = apps.get_model(app_name, model_name)
                 dependencies.pop(model)
@@ -209,7 +205,7 @@ class Search(FieldMappingMixin):
             return False
 
         def validate_properties(lhs, rhs):
-            for name, info in six.iteritems(lhs):
+            for name, info in lhs.items():
                 if name not in rhs:
                     return False
                 if info['type'] != rhs[name]['type']:
@@ -304,7 +300,7 @@ class Search(FieldMappingMixin):
                     responses.append(bulk(client=es, actions=tuple(actions)))
                     es.indices.refresh(index=index)
                 except BulkIndexError as e:
-                    logger.error("Failure during bulk index: {}".format(six.text_type(e)))
+                    logger.error("Failure during bulk index: {}".format(e))
             return responses
         except AssertionError:
             if not qs.count():
@@ -323,7 +319,7 @@ class Search(FieldMappingMixin):
                 es.indices.refresh(index=index)
                 return response
             except BulkIndexError as e:
-                logger.error("Failure during bulk index: {}".format(six.text_type(e)))
+                logger.error("Failure during bulk index: {}".format(e))
 
     def bulk_clear(self):
         doc_type = self.get_doc_type()
@@ -340,7 +336,7 @@ class Search(FieldMappingMixin):
             logger.info(log_msg.format(len(actions), index))
             return bulk(client=es, actions=tuple(actions))
         except BulkIndexError as e:
-            logger.error("Failure during bulk clear: {}".format(six.text_type(e)))
+            logger.error("Failure during bulk clear: {}".format(e))
 
     def bulk_prune(self):
         doc_type = self.get_doc_type()
@@ -366,7 +362,7 @@ class Search(FieldMappingMixin):
                     logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
                     responses.append(bulk(client=es, actions=tuple(actions)))
                 except BulkIndexError as e:
-                    logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
+                    logger.warning("Failure during bulk prune: {}".format(e))
             return responses
         except AssertionError:
             if not qs.count():
@@ -384,13 +380,14 @@ class Search(FieldMappingMixin):
                 logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
                 return bulk(client=es, actions=tuple(actions))
             except BulkIndexError as e:
-                logger.warning("Failure during bulk prune: {}".format(six.text_type(e)))
+                logger.warning("Failure during bulk prune: {}".format(e))
 
 
 class SearchDescriptor(object):
     def __get__(self, instance, type=None):
         if instance != None:
-            raise AttributeError("Search isn't accessible via {} instances".format(type.__name__))
+            msg = "Search isn't accessible via {} instances"
+            raise AttributeError(msg.format(type.__name__))
         return type._search_meta().get_search()
 
 
