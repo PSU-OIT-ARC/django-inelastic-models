@@ -2,6 +2,39 @@
 CHANGELOG
 =========
 
+7.0
+---
+
+2021-04-??
+
+This release adds support for, and requires, the use of ES 7.x.
+
+This release marks a departure from the previous release strategy.
+To reduce confusion and to provide better support for a variety of
+Elasticsearch installations, releases will follow the major ES
+release versions as is done with the 'elasticsearch-py' and the
+'elasticsearch-dsl-py' packages.
+
+* Uses analyzer, tokenizer constructions compatible with ES >= 5.0
+* Replaces the use of the 'string' type field with 'text' [ES>=5.0].
+* Removes use of 'flush' API [ES>=6].
+* Removes support for Python 2 and related compatibility shims.
+* Replaces deprecated ngram type names [ES>=8.0].
+* Revises index construction to support mapping type removal [ES>=8.0].
+* Adds new field 'KitchenSinkField' to replace the functionality
+  of the historical '_all' index field [ES>=6.0].
+
+1.5
+---
+
+2020-02-27
+
+* Fixes exception handling during chunked indexing.
+* Improves performance of 'bulk_prune' operation.
+* Fixes erroneous dict modification during iteration.
+* Adds missing assertions, guards for empty index requests.
+* Adds support for WDT PYPI instance.
+
 1.4
 ---
 
