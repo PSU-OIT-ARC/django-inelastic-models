@@ -71,7 +71,10 @@ class TemplateField(SearchField):
         return render_to_string(template_name, context)
 
 
-class EmailURLAllField(SearchField):
+class KitchenSinkField(SearchField):
+    """
+    A field type to be used as a replacement for the deprecated '_all' field.
+    """
     def get_field_settings(self):
         settings = super().get_field_settings()
         settings = merge([settings, {
@@ -288,10 +291,16 @@ class FieldMappingMixin(object):
         return merge([f.get_field_settings() for f in self.get_fields().values()])
 
     def get_mapping(self):
-        properties = dict((name, field.get_field_mapping())
-                          for name, field in list(self.get_fields().items()))
-        mapping = {'properties': properties}
-        return mapping
+        properties = {}
+
+        for name, field in self.get_fields().items():
+            mapping = field.get_field_mapping()
+            if all([getattr(settings, 'ELASTICSEARCH_KITCHEN_SINK_FIELD', False),
+                    'properties' not in mapping]):
+                mapping['copy_to'] = 'kitchen_sink'
+            properties[name] = mapping
+
+        return {'properties': properties}
 
     def prepare(self, instance):
         return dict((name, field.get_from_instance(instance))

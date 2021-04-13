@@ -11,7 +11,7 @@ from django.conf import settings
 from django.apps import apps
 from django.db import models
 
-from .fields import FieldMappingMixin, EmailURLAllField
+from .fields import FieldMappingMixin, KitchenSinkField
 from .utils import merge
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,6 @@ class Search(FieldMappingMixin):
     mapping = None
     index_by = CHUNKSIZE
     date_field = 'modified_on'
-    all_field = EmailURLAllField()
 
     @classmethod
     def bind_to_model(cls, model):
@@ -89,13 +88,16 @@ class Search(FieldMappingMixin):
     dependencies = {}
 
     def get_settings(self):
-        settings = super().get_settings()
-        settings = merge([settings, self.all_field.get_field_settings()])
-        return settings
+        field_settings = super().get_settings()
+        if getattr(settings, 'ELASTICSEARCH_KITCHEN_SINK_FIELD', False):
+            field_settings = merge([field_settings,
+                                    KitchenSinkField().get_field_settings()])
+        return field_settings
 
     def get_mapping(self):
         mapping = super().get_mapping()
-        mapping['_all'] = self.all_field.get_field_mapping()
+        if getattr(settings, 'ELASTICSEARCH_KITCHEN_SINK_FIELD', False):
+            mapping['properties']['kitchen_sink'] = KitchenSinkField().get_field_mapping()
         return mapping
 
     def get_index(self):
