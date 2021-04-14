@@ -256,26 +256,42 @@ class Search(FieldMappingMixin):
 
     def index_instance(self, instance):
         if self.get_qs().filter(pk=instance.pk).exists():
-            logger.debug("Indexing instance '{}'".format(instance))
-            self.get_es().index(
-                index=self.get_index(),
-                id=instance.pk,
-                body=self.prepare(instance))
+            try:
+                logger.debug("Indexing instance '{}'".format(instance))
+                self.get_es().index(
+                    index=self.get_index(),
+                    id=instance.pk,
+                    body=self.prepare(instance)
+                )
+            except exceptions.ConnectionTimeout as exc:
+                msg = "Index request for '{}' timed out."
+                logger.warning(mgs.format(instance))
+            except exceptions.ConnectionError as exc:
+                msg = "Index request for '{}' encountered a connection error."
+                logger.warning(msg.format(instance))
         else:
             try:
-                instance.refresh_from_db()
-                logger.debug("Un-indexing instance '{}'".format(instance))
-            except:
-                logger.debug("Un-indexing instance '{}'".format(instance.pk))
-            finally:
+                instance_repr = '{} ({})'.format(instance.__class__.__name__, instance.pk)
+                logger.debug("Un-indexing instance {}".format(instance_repr))
                 self.get_es().delete(
                     index=self.get_index(),
                     id=instance.pk,
-                    ignore=404)
+                    ignore=404
+                )
+            except exceptions.ConnectionTimeout as exc:
+                msg = "Unindex request for '{}' timed out."
+                logger.warning(mgs.format(instance))
+            except exceptions.ConnectionError as exc:
+                msg = "Unindex request for '{}' encountered a connection error."
+                logger.warning(msg.format(instance))
 
     def index_qs(self, qs):
         index = self.get_index()
         es = self.get_es()
+
+        if not qs.exists():
+            logger.info("Bulk index request received for empty queryset. Skipping.")
+            return None
 
         try:
             assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
@@ -293,12 +309,16 @@ class Search(FieldMappingMixin):
                     es.indices.refresh(index=index)
                 except BulkIndexError as e:
                     logger.error("Failure during bulk index: {}".format(e))
-            return responses
-        except AssertionError:
-            if not qs.count():
-                logger.info("No objects to index")
-                return None
+                except exceptions.ConnectionTimeout as exc:
+                    msg = "Bulk index request timed out."
+                    logger.warning(mgs.format(instance))
+                except exceptions.ConnectionError as exc:
+                    msg = "Bulk index request encountered a connection error."
+                    logger.warning(msg.format(instance))
 
+            return responses
+
+        except AssertionError:
             try:
                 actions = [
                     {'_index': index,
@@ -311,6 +331,12 @@ class Search(FieldMappingMixin):
                 return response
             except BulkIndexError as e:
                 logger.error("Failure during bulk index: {}".format(e))
+            except exceptions.ConnectionTimeout as exc:
+                msg = "Bulk index request timed out."
+                logger.warning(mgs.format(instance))
+            except exceptions.ConnectionError as exc:
+                msg = "Bulk index request encountered a connection error."
+                logger.warning(msg.format(instance))
 
     def bulk_clear(self):
         index = self.get_index()

@@ -68,27 +68,13 @@ def update_search_index(sender, **kwargs):
         logger.debug("Skipping indexing for '%s'" % (sender))
         return
 
-    try:
-        instance.index()
-    except elasticsearch.exceptions.ConnectionTimeout as exc:
-        msg = "Index request for '{}' timed-out."
-        logger.warning(mgs.format(instance))
-    except elasticsearch.exceptions.ConnectionError as exc:
-        msg = "Index request for '{}' encountered a connection error."
-        logger.warning(msg.format(instance))
+    instance.index()
     
     dependents = merge([instance._search_dependents, get_dependents(instance)])
     for model, qs in dependents.items():
         search_meta = model._search_meta()
         for record in qs.iterator():
-            try:
-                search_meta.index_instance(record)
-            except elasticsearch.exceptions.ConnectionTimeout as exc:
-                msg = "Index request for '{}' timed out."
-                logger.warning(msg.format(record))
-            except elasticsearch.exceptions.ConnectionError as exc:
-                msg = "Index request for '{}' encountered a connection error."
-                logger.warning(msg.format(record))
+            search_meta.index_instance(record)
 
 
 @receiver(signals.m2m_changed)
