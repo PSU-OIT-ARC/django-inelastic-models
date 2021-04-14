@@ -33,6 +33,7 @@ test-container: init  ## Run tests in a container
 	$(docker-compose) run test make test venv=.env-test
 	# sudo rm -rf .env-test
 
+upload-dist: venv_update=true
 upload-dist: clean init ## Builds and uploads distribution
 	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(venv) bash -
 
