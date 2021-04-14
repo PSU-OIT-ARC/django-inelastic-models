@@ -59,6 +59,8 @@ class AwareResult(dsl.response.Hit):
         super().__init__(document)
 
         for name, field in search_meta.get_fields().items():
+            if name not in self:
+                continue
             self[name] = field.to_python(self[name])
 
     @classmethod
