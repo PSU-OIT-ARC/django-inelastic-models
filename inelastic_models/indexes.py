@@ -72,9 +72,8 @@ class AwareResult(dsl.response.Hit):
 
 class Search(FieldMappingMixin):
     connection = 'default'
-    mapping = None
-    index_by = CHUNKSIZE
     date_field = 'modified_on'
+    index_by = CHUNKSIZE
 
     @classmethod
     def bind_to_model(cls, model):
@@ -396,7 +395,7 @@ class Search(FieldMappingMixin):
                 logger.warning("Failure during bulk prune: {}".format(e))
 
 
-class SearchDescriptor(object):
+class SearchDescriptor:
     def __get__(self, instance, type=None):
         if instance != None:
             msg = "Search isn't accessible via {} instances"
@@ -404,7 +403,7 @@ class SearchDescriptor(object):
         return type._search_meta().get_search()
 
 
-class SearchMixin(object):
+class SearchMixin:
     @classmethod
     def _search_meta(cls):
         return getattr(cls, 'Search')(model=cls)

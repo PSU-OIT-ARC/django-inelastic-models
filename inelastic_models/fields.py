@@ -1,6 +1,8 @@
-import dateutil
+import datetime
 import logging
 import copy
+
+import dateutil
 
 from django.template.loader import render_to_string
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -13,16 +15,9 @@ from .utils import merge
 logger = logging.getLogger(__name__)
 
 
-class SearchField(object):
-    mapping = None
-    mapping_type = 'text'
+class SearchField:
+    mapping_type = None
     index = True
-
-    def __init__(self, *args, **kwargs):
-        if 'index' in kwargs:
-            self.index = kwargs.pop('index')
-
-        super().__init__(*args, **kwargs)
 
     def get_analyzer(self):
         return (None, {})
@@ -30,10 +25,8 @@ class SearchField(object):
     def get_tokenizer(self):
         return (None, {})
 
-    def get_field_mapping(self):
-        if self.mapping is not None:
-            return self.mapping
 
+    def get_field_mapping(self):
         mapping = {'type': self.mapping_type}
         (a_name, _) = self.get_analyzer()
         if self.index is False:
@@ -62,9 +55,12 @@ class SearchField(object):
 
 
 class TemplateField(SearchField):
+    mapping_type = 'text'
+
     def __init__(self, template_name):
+        super().__init__()
+
         self.template_name = template_name
-        super().__init__(*args, **kwargs)
 
     def get_from_instance(self, instance):
         context = {'object': self.instance}
@@ -75,6 +71,8 @@ class KitchenSinkField(SearchField):
     """
     A field type to be used as a replacement for the deprecated '_all' field.
     """
+    mapping_type = 'text'
+
     def get_field_settings(self):
         settings = super().get_field_settings()
         settings = merge([settings, {
@@ -102,9 +100,10 @@ class KitchenSinkField(SearchField):
 
 
 class AttributeField(SearchField):
-    def __init__(self, attr, *args, **kwargs):
+    def __init__(self, attr):
+        super().__init__()
+
         self.path = attr.split(".")
-        super().__init__(*args, **kwargs)
 
     def get_from_instance(self, instance):
         for attr in self.path:
@@ -136,7 +135,24 @@ class StringField(AttributeField):
         return str(value) or ""
 
 
-class TranslationField(StringField):
+class KeywordField(StringField):
+    mapping_type = 'keyword'
+
+
+
+class CharField(StringField):
+    mapping_type = 'text'
+
+    def get_analyzer(self):
+        return (
+            'keyword_analyzer', {
+                'tokenizer': 'keyword',
+                'filter': ['trim', 'lowercase']
+            }
+        )
+
+
+class TranslationField(CharField):
     def __init__(self, attr, *args, **kwargs):
         self.language_name = kwargs.pop('language', None)
         super().__init__(attr, *args, **kwargs)
@@ -148,21 +164,25 @@ class TranslationField(StringField):
         return mapping
 
 
+class TextField(StringField):
+    mapping_type = 'text'
+
+
 class NGramField(StringField):
+    mapping_type = 'text'
     min_gram = 2
     max_gram = 4
 
     def __init__(self, *args, **kwargs):
         if 'min_gram' in kwargs:
             self.min_gram = kwargs.pop('min_gram')
-
         if 'max_gram' in kwargs:
             self.max_gram = kwargs.pop('max_gram')
 
         super().__init__(*args, **kwargs)
 
     def get_tokenizer(self):
-        name = "ngram_tokenizer_%d_%d" % (self.min_gram, self.max_gram)
+        name = "ngram_tokenizer_{}_{}".format(self.min_gram, self.max_gram)
         return (name, {'type': 'ngram',
                        'min_gram': self.min_gram,
                        'max_gram': self.max_gram,
@@ -174,22 +194,16 @@ class NGramField(StringField):
         return (name, {'tokenizer': t_name, 'filter': ['lowercase']})
 
 
-class MultiField(AttributeField):
-    def get_from_instance(self, instance):
-        manager = super().get_from_instance(instance)
-        return self.render(manager)
-
-    def render(self, manager):
-        return "\n".join(str(i) for i in manager.all())
-
-
-class ListField(MultiField):
-    def render(self, manager):
-        return list(str(i) for i in manager.all())
-
-
 class IntegerField(AttributeField):
     mapping_type = 'integer'
+
+
+class FloatField(AttributeField):
+    mapping_type = 'float'
+
+
+class DecimalField(AttributeField):
+    mapping_type = 'double'
 
 
 class BooleanField(AttributeField):
@@ -206,6 +220,44 @@ class DateField(AttributeField):
         return super().to_python(value)
 
 
+class DurationField(AttributeField):
+    mapping_type = 'unsigned_long'
+
+    def to_python(self, value):
+        return value.total_seconds
+
+
+class ListField(AttributeField):
+    def get_from_instance(self, instance):
+        instance = super().get_from_instance(instance)
+        if hasattr(instance, 'all'):
+            instance = instance.all()
+        return list(str(i) for i in instance)
+
+
+class KeywordListField(ListField):
+    mapping_type = 'keyword'
+
+
+class TextListField(ListField):
+    mapping_type = 'text'
+
+
+class MultiField(AttributeField):
+    mapping_type = 'text'
+
+
+class RenderedAttributeField(AttributeField):
+    mapping_type = 'text'
+
+    def get_from_instance(self, instance):
+        reference = super().get_from_instance(instance)
+        return self.render(reference)
+
+    def render(self, manager):
+        raise NotImplementedError
+
+
 class FieldMappingMixin(object):
     attribute_fields = ()
     template_fields = ()
@@ -217,13 +269,10 @@ class FieldMappingMixin(object):
     def __init__(self, *args, **kwargs):
         if 'model' in kwargs:
             self.model = kwargs.pop('model')
-
         if 'attribute_fields' in kwargs:
             self.attribute_fields = kwargs.pop('attribute_fields')
-
         if 'template_fields' in kwargs:
             self.template_fields = kwargs.pop('template_fields')
-
         if 'other_fields' in kwargs:
             self.other_fields = kwargs.pop('other_fields')
 
@@ -234,6 +283,7 @@ class FieldMappingMixin(object):
         # determine the search index field type.
         path = attr.split(".")
         name = path[-1]
+
         try:
             model = self.model
             for a in path[:-1]:
@@ -242,23 +292,29 @@ class FieldMappingMixin(object):
 
             if isinstance(field, models.BooleanField):
                 return (name, BooleanField(attr=attr))
-            elif isinstance(field, models.IntegerField):
+            elif isinstance(field, (models.ForeignKey,
+                                    models.IntegerField)):
                 return (name, IntegerField(attr=attr))
+            elif isinstance(field, models.FloatField):
+                return (name, FloatField(attr=attr))
+            elif isinstance(field, models.DecimalField):
+                return (name, DecimalField(attr=attr))
             elif isinstance(field, models.DateField):
                 return (name, DateField(attr=attr))
-            elif isinstance(field, models.EmailField):
-                return (name, StringField(attr=attr, index='not_analyzed'))
-            elif isinstance(field, models.ManyToManyField) or \
-                 isinstance(field, ForeignObjectRel):
-                return (name, MultiField(attr=attr))
+            elif isinstance(field, models.DurationField):
+                return (name, DurationField(attr=attr))
+            elif isinstance(field, models.CharField):
+                return (name, CharField(attr=attr))
+            elif isinstance(field, models.TextField):
+                return (name, TextField(attr=attr))
             else:
-                return (name, StringField(attr=attr))
+                return (name, KeywordField(attr=attr))
 
         except models.FieldDoesNotExist:
-            return (name, StringField(attr=attr))
+            return (name, KeywordField(attr=attr))
         except AttributeError as exc:
             if not hasattr(self, 'model'):
-                return (name, StringField(attr=attr))
+                return (name, KeywordField(attr=attr))
             raise exc
 
     def get_fields(self):
@@ -309,29 +365,31 @@ class FieldMappingMixin(object):
                     for name, field in list(self.get_fields().items()))
 
 
-class ObjectField(FieldMappingMixin, AttributeField):
-    mapping_type = 'object'
-
+class ObjectFieldMixin(FieldMappingMixin):
     def get_field_mapping(self):
         mapping = super().get_field_mapping()
         mapping.update(self.get_mapping())
         return mapping
+
+    def get_field_settings(self):
+        settings = super().get_field_settings()
+        settings = merge([settings, self.get_settings()])
+        return settings
+
+    
+class ObjectField(ObjectFieldMixin, AttributeField):
+    mapping_type = 'object'
 
     def get_from_instance(self, instance):
         instance = super().get_from_instance(instance)
         return self.prepare(instance)
 
 
-class MultiObjectField(FieldMappingMixin, MultiField):
-    """ a list of dictionaries """
+class MultiObjectField(ObjectFieldMixin, AttributeField):
     mapping_type = 'nested'
-    index = None
 
-    def get_field_mapping(self):
-        mapping = super().get_field_mapping()
-        mapping.update(self.get_mapping())
-        return mapping
-
-    def render(self, manager):
-        object_list = []
-        return [self.prepare(i) for i in manager.all()]
+    def get_from_instance(self, instance):
+        instance = super().get_from_instance(instance)
+        if hasattr(instance, 'all'):
+            instance = instance.all()
+        return [self.prepare(i) for i in instance]
