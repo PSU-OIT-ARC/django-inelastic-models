@@ -91,15 +91,16 @@ class Search(FieldMappingMixin):
 
     def get_settings(self):
         field_settings = super().get_settings()
-        if getattr(settings, 'ELASTICSEARCH_KITCHEN_SINK_FIELD', False):
+        if self.use_all_field:
             field_settings = merge([field_settings,
                                     KitchenSinkField().get_field_settings()])
         return field_settings
 
     def get_mapping(self):
         mapping = super().get_mapping()
-        if getattr(settings, 'ELASTICSEARCH_KITCHEN_SINK_FIELD', False):
-            mapping['properties']['kitchen_sink'] = KitchenSinkField().get_field_mapping()
+        if self.use_all_field:
+            all_field = KitchenSinkField().get_field_mapping()
+            mapping['properties'][self.all_field_name] = all_field
         return mapping
 
     def get_index(self):

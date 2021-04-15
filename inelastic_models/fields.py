@@ -80,13 +80,13 @@ class KitchenSinkField(SearchField):
         settings = merge([settings, {
             'analysis': {
                 'analyzer': {
-                    'email_url_analyzer': {
-                        'tokenizer': 'email_url_tokenizer',
-                        'filter': ['lowercase'],
+                    'kitchen_sink_analyzer': {
+                        'tokenizer': 'kitchen_sink_tokenizer',
+                        'filter': ['lowercase', ],
                     }
                 },
                 'tokenizer': {
-                    'email_url_tokenizer' : {
+                    'kitchen_sink_tokenizer' : {
                         'type': 'uax_url_email',
                     }
                 },
@@ -97,7 +97,7 @@ class KitchenSinkField(SearchField):
 
     def get_field_mapping(self):
         mapping = super().get_field_mapping()
-        mapping['analyzer'] = 'email_url_analyzer'
+        mapping['analyzer'] = 'kitchen_sink_analyzer'
         return mapping
 
 
@@ -211,6 +211,9 @@ class FieldMappingMixin(object):
     template_fields = ()
     other_fields = {}
 
+    use_all_field = getattr(settings, 'ELASTICSEARCH_USE_ALL_FIELD', False)
+    all_field_name = getattr(settings, 'ELASTICSEARCH_ALL_FIELD_NAME', '_all')
+
     def __init__(self, *args, **kwargs):
         if 'model' in kwargs:
             self.model = kwargs.pop('model')
@@ -295,9 +298,8 @@ class FieldMappingMixin(object):
 
         for name, field in self.get_fields().items():
             mapping = field.get_field_mapping()
-            if all([getattr(settings, 'ELASTICSEARCH_KITCHEN_SINK_FIELD', False),
-                    'properties' not in mapping]):
-                mapping['copy_to'] = 'kitchen_sink'
+            if all([self.use_all_field, 'properties' not in mapping]):
+                mapping['copy_to'] = self.all_field_name
             properties[name] = mapping
 
         return {'properties': properties}
