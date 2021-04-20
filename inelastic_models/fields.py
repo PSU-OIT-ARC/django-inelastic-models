@@ -25,14 +25,21 @@ class SearchField:
     def get_tokenizer(self):
         return (None, {})
 
+    def get_normalizer(self):
+        return (None, {})
 
     def get_field_mapping(self):
         mapping = {'type': self.mapping_type}
-        (a_name, _) = self.get_analyzer()
         if self.index is False:
             mapping['index'] = False
+
+        (a_name, _) = self.get_analyzer()
         if a_name is not None:
             mapping['analyzer'] = a_name
+
+        (n_name, _) = self.get_normalizer()
+        if n_name is not None:
+            mapping['normalizer'] = n_name
 
         return mapping
 
@@ -40,14 +47,20 @@ class SearchField:
         settings = {}
 
         (t_name, t_def) = self.get_tokenizer()
-        (a_name, a_def) = self.get_analyzer()
         if t_def:
             settings['tokenizer'] = dict([(t_name, t_def)])
+
+        (a_name, a_def) = self.get_analyzer()
         if a_def:
             settings['analyzer'] = dict([(a_name, a_def)])
 
+        (n_name, n_def) = self.get_normalizer()
+        if n_def:
+            settings['normalizer'] = dict([(n_name, n_def)])
+
         if not settings:
             return settings
+
         return {'analysis': settings}
 
     def get_from_instance(self, instance):
@@ -138,6 +151,12 @@ class StringField(AttributeField):
 class KeywordField(StringField):
     mapping_type = 'keyword'
 
+    def get_normalizer(self):
+        return (
+            'keyword_normalizer', {
+                'filter': ['trim', 'lowercase']
+            }
+        )
 
 
 class CharField(StringField):
