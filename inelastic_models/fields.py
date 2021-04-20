@@ -284,6 +284,7 @@ class FieldMappingMixin(object):
 
     use_all_field = getattr(settings, 'ELASTICSEARCH_USE_ALL_FIELD', False)
     all_field_name = getattr(settings, 'ELASTICSEARCH_ALL_FIELD_NAME', '_all')
+    index_ordering = getattr(settings, 'ELASTICSEARCH_INDEX_ORDERING', None)
 
     def __init__(self, *args, **kwargs):
         if 'model' in kwargs:

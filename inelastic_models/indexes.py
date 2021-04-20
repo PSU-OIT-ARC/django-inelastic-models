@@ -252,6 +252,9 @@ class Search(FieldMappingMixin):
         if limit:
             qs = qs[:limit]
 
+        if self.index_ordering is not None:
+            qs = qs.order_by(*self.index_ordering)
+
         return qs
 
     def index_instance(self, instance):
