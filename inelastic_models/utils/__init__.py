@@ -21,7 +21,7 @@ def merge(items, overwrite=True):
         return dict((k, merge([i[k] for i in items if k in i], overwrite)) for k in keys)
     elif all(isinstance(i, list) for i in items):
         # Merge lists by chaining them together.
-        return list(chain.from_iterable(items))
+        return list(set(chain.from_iterable(items)))
     elif all(isinstance(i, set) for i in items):
         # Merge sets by unioning them together.
         return set().union(*items)
