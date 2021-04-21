@@ -76,7 +76,7 @@ class TemplateField(SearchField):
         self.template_name = template_name
 
     def get_from_instance(self, instance):
-        context = {'object': self.instance}
+        context = {'object': instance}
         return render_to_string(template_name, context)
 
 
