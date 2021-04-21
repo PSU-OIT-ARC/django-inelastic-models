@@ -63,6 +63,13 @@ class AwareResult(dsl.response.Hit):
                 continue
             self[name] = field.to_python(self[name])
 
+            # Support query result serialization (e.g., JSON) by translating
+            # non-native utility types 'AttrList', 'AttrDict'.
+            if isinstance(self[name], dsl.utils.AttrList):
+                self[name] = self[name]._l_
+            elif isinstance(self[name], dsl.utils.AttrDict):
+                self[name] = self[name]._d_
+
     @classmethod
     def make_callback(cls, search_meta):
         def callback(document):
