@@ -249,6 +249,9 @@ class DurationField(AttributeField):
 class ListField(AttributeField):
     def get_from_instance(self, instance):
         instance = super().get_from_instance(instance)
+        if instance is None:
+            return {}
+
         if hasattr(instance, 'all'):
             instance = instance.all()
         return list(str(i) for i in instance)
@@ -402,6 +405,9 @@ class ObjectField(ObjectFieldMixin, AttributeField):
 
     def get_from_instance(self, instance):
         instance = super().get_from_instance(instance)
+        if instance is None:
+            return {}
+
         return self.prepare(instance)
 
 
@@ -410,6 +416,9 @@ class MultiObjectField(ObjectFieldMixin, AttributeField):
 
     def get_from_instance(self, instance):
         instance = super().get_from_instance(instance)
+        if instance is None:
+            return []
+
         if hasattr(instance, 'all'):
             instance = instance.all()
         return [self.prepare(i) for i in instance]
