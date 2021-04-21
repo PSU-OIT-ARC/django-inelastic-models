@@ -79,6 +79,18 @@ class Search(FieldMappingMixin):
     def bind_to_model(cls, model):
         setattr(model, 'Search', cls)
 
+    @classmethod
+    def as_field(cls, attr, model, field_type):
+        field = field_type(
+            attr,
+            model=model,
+            attribute_fields=cls.attribute_fields,
+            template_fields=cls.template_fields,
+            other_fields=cls.other_fields
+        )
+        field.use_all_field = cls.use_all_field
+        return field
+
     # A dictionary whose keys are other models that this model's index
     # depends on, and whose values are query set paramaters for this model
     # to select the instances that depend on an instance of the key model.
