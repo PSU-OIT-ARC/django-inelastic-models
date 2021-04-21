@@ -28,6 +28,9 @@ class SearchField:
     def get_normalizer(self):
         return (None, {})
 
+    def get_filter(self):
+        return (None, {})
+
     def get_field_mapping(self):
         mapping = {'type': self.mapping_type}
         if self.index is False:
@@ -57,6 +60,10 @@ class SearchField:
         (n_name, n_def) = self.get_normalizer()
         if n_def:
             settings['normalizer'] = dict([(n_name, n_def)])
+
+        (f_name, f_def) = self.get_filter()
+        if f_def:
+            settings['filter'] = dict([(f_name, f_def)])
 
         if not settings:
             return settings
@@ -200,8 +207,8 @@ class NGramField(StringField):
 
         super().__init__(*args, **kwargs)
 
-    def get_tokenizer(self):
-        name = "ngram_tokenizer_{}_{}".format(self.min_gram, self.max_gram)
+    def get_filter(self):
+        name = "ngram_filter_{}_{}".format(self.min_gram, self.max_gram)
         return (name, {'type': 'ngram',
                        'min_gram': self.min_gram,
                        'max_gram': self.max_gram,
@@ -210,7 +217,9 @@ class NGramField(StringField):
     def get_analyzer(self):
         (t_name, _) = self.get_tokenizer()
         name = "ngram_analyzer_{}_{}".format(self.min_gram, self.max_gram)
-        return (name, {'tokenizer': t_name, 'filter': ['lowercase']})
+        filter_name = "ngram_filter_{}_{}".format(self.min_gram, self.max_gram)
+        return (name, {'tokenizer': "standard",
+                       'filter': [filter_name]})
 
 
 class IntegerField(AttributeField):
