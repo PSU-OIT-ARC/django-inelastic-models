@@ -18,13 +18,14 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
     def setUp(self):
         super().setUp()
 
-        tm = self.create_instance(name='Test1',
-                                  date=datetime.date(2015, 1, 1),
-                                  email="test1@example.com")
+        tm = self.create_instance(name='Test1 one two three',
+                                  email="test1@example.com",
+                                  date=datetime.date(2015, 1, 1))
+
         tm.save()
-        tm2 = self.create_instance(name='Test2',
-                                   date=None,
-                                   email="test2@example.com")
+        tm2 = self.create_instance(name='Test2 four five six',
+                                   email="test2@example.com",
+                                   date=None)
         tm.save()
 
         tsfm = G(SearchFieldModel, related=tm)
@@ -40,16 +41,16 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
     def test_attribute_field(self):
         self.assertEqual(Model.search.count(), 2)
         self.assertEqual(set(h.name for h in Model.search.execute().hits),
-                         set(['Test1', 'Test2']))
+                         set(['Test1 one two three', 'Test2 four five six']))
 
     def test_date_field(self):
-        hits = Model.search.query('match', name='Test1').execute().hits
+        hits = Model.search.query('match', name='Test1 one two three').execute().hits
         self.assertEqual(len(hits), 1)
 
         # Check that dates are returned as datetime.date
         self.assertEqual(hits[0].date, datetime.date(2015, 1, 1))
 
-        hits = Model.search.query('match', name='Test2').execute().hits
+        hits = Model.search.query('match', name='Test2 four five six').execute().hits
         self.assertEqual(len(hits), 1)
 
         # Check proper handling of None
@@ -58,12 +59,12 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
     def test_list_field(self):
         hits = SearchFieldModel.search.execute().hits
         self.assertEqual(len(hits), 1)
-        self.assertIn('Test1', hits[0].model_list)
+        self.assertIn('Test1 one two three', hits[0].model_list)
 
     def test_object_field(self):
         hits = SearchFieldModel.search.execute().hits
         self.assertEqual(len(hits), 1)
-        self.assertEqual(hits[0].related.name, 'Test1')
+        self.assertEqual(hits[0].related.name, 'Test1 one two three')
 
     def test_reverse_multiobject_field(self):
         hits = SearchFieldModel.search.execute().hits
@@ -71,19 +72,46 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertEqual(len(hits[0].model_objects), 2)
         hit_names = set(h.name for h in hits[0].model_objects)
-        self.assertIn('Test1', hit_names)
-        self.assertIn('Test2', hit_names)
+        self.assertIn('Test1 one two three', hit_names)
+        self.assertIn('Test2 four five six', hit_names)
 
-    def test_string_analyzed(self):
+    def test_keyword_field(self):
+        query = Model.search.query('term', keyword="Test1")
+        self.assertEqual(len(query.execute().hits), 0)
+
+        query = Model.search.query('match', keyword="Test1")
+        self.assertEqual(len(query.execute().hits), 0)
+
+        query = Model.search.query('term', keyword="Test1 one two three")
+        self.assertEqual(len(query.execute().hits), 1)
+
+        query = Model.search
+        query.aggs.bucket('keyword', 'terms', field='keyword')
+        self.assertNotEqual(query.execute().aggregations.to_dict(), {})
+
+    def test_char_field(self):
         query = Model.search.query('match', email='test1@example.com')
+        self.assertEqual(len(query.execute().hits), 1)
+
+        mapping = Model._search_meta().get_mapping()
+        self.assertFalse('tokenizer' in mapping['properties']['email'])
+
+        # text mapping types don't support aggregations, sorting
+        with self.assertRaises(elasticsearch.exceptions.TransportError):
+            query = Model.search
+            query.aggs.bucket('char', 'terms', field='char')
+            query.execute()
+
+    def test_text_field(self):
+        query = Model.search.query('match', text='one four')
         self.assertEqual(len(query.execute().hits), 2)
 
-    def test_string_not_indexed(self):
-        mapping = Model._search_meta().get_mapping()
-        self.assertFalse(mapping['properties']['test_email']['index'])
-
-        # This field is not indexed:
-        #   field will not be queryable.
+        # text mapping types don't support aggregations, sorting
         with self.assertRaises(elasticsearch.exceptions.TransportError):
-            query = Model.search.query('match', test_email='test1@example.com')
+            query = Model.search
+            query.aggs.bucket('text', 'terms', field='text')
             query.execute()
+
+    def test_ngram_field(self):
+        query = Model.search.query('match', ngram='est')
+        self.assertEqual(len(query.execute().hits), 2)

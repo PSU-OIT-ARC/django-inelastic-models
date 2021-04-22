@@ -93,18 +93,28 @@ class UpdateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
         self.assertEqual(Model.search.count(), 2)
 
 
+# TODO
+class PruneIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
+    command_name = 'prune_index'
+
+    def check_command_response(self, response, **kwargs):
+        super().check_command_response(response, **kwargs)
+
+        # todo:
+
+
 class MigrateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
     command_name = 'migrate_index'
 
     def setUp(self):
         super().setUp()
 
-        G(Model, name='Test2', non_indexed_field='Hack the Gibson.')
-        ModelSearch.attribute_fields.append('non_indexed_field')
+        G(Model, name='Test2', new_field='Hack the Gibson.')
+        ModelSearch.attribute_fields.append('new_field')
 
     def check_command_response(self, response, **kwargs):
         super().check_command_response(response, **kwargs)
 
         refresh_search_indexes()
-        self.assertEqual(Model.search.query('match', test_ngram='Test').count(), 2)
-        self.assertEqual(Model.search.query('match', non_indexed_field='Hack the Gibson.').count(), 1)
+        self.assertEqual(Model.search.query('match', ngram='Test').count(), 2)
+        self.assertEqual(Model.search.query('match', new_field='Hack the Gibson.').count(), 1)

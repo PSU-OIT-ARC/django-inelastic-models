@@ -14,10 +14,10 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('name', models.CharField(max_length=256)),
-                ('modified_on', models.DateTimeField(auto_now=True)),
-                ('date', models.DateField(null=True, blank=True)),
                 ('email', models.EmailField(max_length=254, blank=True)),
-                ('non_indexed_field', models.CharField(max_length=16, blank=True)),
+                ('date', models.DateField(null=True, blank=True)),
+                ('modified_on', models.DateTimeField(auto_now=True)),
+                ('new_field', models.CharField(max_length=16, blank=True)),
             ],
             bases=(inelastic_models.indexes.SearchMixin, models.Model),
         ),

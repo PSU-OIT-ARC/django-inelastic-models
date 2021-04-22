@@ -1,15 +1,20 @@
 from django.db import models
 
 from ..indexes import SearchMixin, Search
-from ..fields import (ListField, StringField, NGramField,
-                      ObjectField, MultiObjectField)
+from ..fields import (KeywordField,
+                      CharField,
+                      TextField,
+                      NGramField,
+                      KeywordListField,
+                      ObjectField,
+                      MultiObjectField)
 
 TEST_MODEL_EXCLUDE_NAME = 'NO'
 
 
 class Model(SearchMixin, models.Model):
     name = models.CharField(max_length=256)
-    modified_on = models.DateTimeField(auto_now=True)
+    email = models.EmailField(blank=True)
     date = models.DateField(null=True, blank=True)
     test_list = models.ForeignKey('inelastic_models.SearchFieldModel',
                                   related_name='models',
@@ -17,8 +22,8 @@ class Model(SearchMixin, models.Model):
                                   null=True, blank=True)
     test_m2m = models.ManyToManyField('inelastic_models.SearchFieldModel',
                                       blank=True)
-    email = models.EmailField(blank=True)
-    non_indexed_field = models.CharField(max_length=16, blank=True)
+    modified_on = models.DateTimeField(auto_now=True)
+    new_field = models.CharField(max_length=16, blank=True)
 
     @property
     def count_m2m(self):
@@ -34,12 +39,15 @@ class Model(SearchMixin, models.Model):
 class ModelSearch(Search):
     attribute_fields = ['name', 'date', 'email', 'count_m2m']
     other_fields = {
-        'test_ngram': NGramField('name'),
-        'test_email': StringField('email', index=False)
+        'keyword': KeywordField('name'),
+        'char': CharField('name'),
+        'text': TextField('name'),
+        'ngram': NGramField('name'),
     }
 
     def get_base_qs(self):
         return self.model.objects.exclude(name=TEST_MODEL_EXCLUDE_NAME)
+
 
 ModelSearch.bind_to_model(Model)
 
@@ -59,11 +67,17 @@ class SearchFieldModel(SearchMixin, models.Model):
 
 class SearchFieldModelSearch(Search):
     other_fields = {
-        'model_list': ListField('models'),
+        'model_list': KeywordListField('models'),
         'related': ObjectField(
-            'related', attribute_fields=['name', 'modified_on']),
+            'related',
+            model=Model,
+            attribute_fields=['name', 'modified_on']
+        ),
         'model_objects': MultiObjectField(
-            'model_set', attribute_fields=['name','modified_on']),
+            'model_set',
+            model=SearchFieldModel,
+            attribute_fields=['name', 'modified_on']
+        ),
     }
 
 SearchFieldModelSearch.bind_to_model(SearchFieldModel)
