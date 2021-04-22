@@ -11,8 +11,9 @@ from django.conf import settings
 from django.apps import apps
 from django.db import models
 
-from .fields import FieldMappingMixin, KitchenSinkField
 from .utils import merge
+from .fields import FieldMappingMixin, KitchenSinkField
+
 
 logger = logging.getLogger(__name__)
 

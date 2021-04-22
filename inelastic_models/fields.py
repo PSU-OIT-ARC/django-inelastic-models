@@ -289,7 +289,7 @@ class RenderedAttributeField(AttributeField):
         raise NotImplementedError
 
 
-class FieldMappingMixin(object):
+class FieldMappingMixin:
     attribute_fields = ()
     template_fields = ()
     other_fields = {}
