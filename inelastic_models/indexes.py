@@ -14,11 +14,22 @@ from django.db import models
 from .utils import merge
 from .fields import FieldMappingMixin, KitchenSinkField
 
-
 logger = logging.getLogger(__name__)
 
+CACHE = threading.local()
 CHUNKSIZE = 1000
-_cache = threading.local()
+
+
+def get_client(connection):
+    es_client = getattr(CACHE, 'es_client', None)
+    if es_client is None:
+        config = settings.ELASTICSEARCH_CONNECTIONS[connection]
+        (host_list, options) = (config.get('HOSTS', []),
+                                config.get('CONNECTION_OPTIONS', {}))
+        es_client = Elasticsearch(hosts=host_list, **options)
+        setattr(CACHE, 'es_client', es_client)
+
+    return es_client
 
 
 def queryset_iterator(queryset, chunksize=CHUNKSIZE):
@@ -79,9 +90,23 @@ class AwareResult(dsl.response.Hit):
 
 
 class Search(FieldMappingMixin):
-    connection = 'default'
+    connection = getattr(settings, 'ELASTICSEARCH_DEFAULT_CONNECTION', 'default')
     date_field = 'modified_on'
     index_by = CHUNKSIZE
+
+    # A dictionary whose keys are other models that this model's index
+    # depends on, and whose values are query set paramaters for this model
+    # to select the instances that depend on an instance of the key model.
+    # For example, the index for BlogPost might use information from Author,
+    # so it would have dependencies = {Author: 'author'}.
+    # When an Author is saved, this causes BlogPost's returned by the query
+    # BlogPost.objects.filter(author=instance) to be re-indexed.
+    dependencies = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.client = get_client(self.connection)
 
     @classmethod
     def bind_to_model(cls, model):
@@ -98,15 +123,6 @@ class Search(FieldMappingMixin):
         )
         field.use_all_field = cls.use_all_field
         return field
-
-    # A dictionary whose keys are other models that this model's index
-    # depends on, and whose values are query set paramaters for this model
-    # to select the instances that depend on an instance of the key model.
-    # For example, the index for BlogPost might use information from Author,
-    # so it would have dependencies = {Author: 'author'}.
-    # When an Author is saved, this causes BlogPost's returned by the query
-    # BlogPost.objects.filter(author=instance) to be re-indexed.
-    dependencies = {}
 
     def get_settings(self):
         field_settings = super().get_settings()
@@ -145,19 +161,8 @@ class Search(FieldMappingMixin):
                 dependencies[model_cls] = query
         return dependencies
 
-    def get_es(self):
-        es_client = getattr(_cache, 'es_client', None)
-        if es_client is None:
-            config = settings.ELASTICSEARCH_CONNECTIONS[self.connection]
-            (host_list, options) = (config.get('HOSTS', []),
-                                    config.get('CONNECTION_OPTIONS', {}))
-            es_client = Elasticsearch(hosts=host_list, **options)
-            setattr(_cache, 'es_client', es_client)
-
-        return es_client
-
     def get_search(self):
-        s = dsl.Search(using=self.get_es())
+        s = dsl.Search(using=self.client)
         s = s.index(self.get_index())
         return s.doc_type(**{'_doc': AwareResult.make_callback(self)})
 
@@ -166,16 +171,16 @@ class Search(FieldMappingMixin):
         Creates an index and removes any previously-installed index mapping.
         """
         index = self.get_index()
-        es = self.get_es()
+        es = get_client(self.connection)
 
-        if es.indices.exists(index):
+        if self.client.indices.exists(index):
             logger.warning("Deleting index '{}'".format(index))
-            es.indices.delete(index)
+            self.client.indices.delete(index)
 
         logger.debug("Creating index '{}'".format(index))
-        es.indices.create(index)
-        es.indices.refresh(index=index)
-        es.cluster.health(wait_for_status='yellow')
+        self.client.indices.create(index)
+        self.client.indices.refresh(index=index)
+        self.client.cluster.health(wait_for_status='yellow')
 
     def configure_index(self):
         """
@@ -186,7 +191,6 @@ class Search(FieldMappingMixin):
         """
         settings = self.get_settings()
         index = self.get_index()
-        es = self.get_es()
 
         config = self.get_index_settings()
         index_settings = config.pop('index', {})
@@ -198,9 +202,9 @@ class Search(FieldMappingMixin):
                     'number_of_replicas': index_settings.pop('number_of_replicas')
                 }
             }
-            es.indices.open(index)
-            es.indices.put_settings(replica_settings, index=index)
-            es.indices.refresh(index=index)
+            self.client.indices.open(index)
+            self.client.indices.put_settings(replica_settings, index=index)
+            self.client.indices.refresh(index=index)
 
             if len(index_settings):
                 config.update(index_settings)
@@ -208,37 +212,42 @@ class Search(FieldMappingMixin):
                 settings = merge([config, settings])
 
         try:
-            es.indices.close(index)
+            self.client.indices.close(index)
             logger.debug("Updating settings for index '{}': {}".format(index, settings))
-            es.indices.put_settings(settings, index=index)
+            self.client.indices.put_settings(settings, index=index)
         except exceptions.RequestError as e:
             if settings:
                 raise e
             logger.debug("No settings to update for index '{}'".format(index))
         finally:
-            es.indices.open(index)
-            es.indices.refresh(index=index)
+            self.client.indices.open(index)
+            self.client.indices.refresh(index=index)
 
     def check_mapping(self):
         mapping = self.get_mapping()
         index = self.get_index()
-        es = self.get_es()
 
-        if not es.indices.exists(index=index):
+        if not self.client.indices.exists(index=index):
             return False
 
         def validate_properties(lhs, rhs):
             for name, info in lhs.items():
                 if name not in rhs:
                     return False
+
+                # !!! FIXME !!!
+                # migrate_index triggers a key error for 'type'
+                # (fix migrate?)
                 if info['type'] != rhs[name]['type']:
                     return False
                 if 'properties' in info:
-                    validate_properties(info['properties'],
-                                        rhs[name]['properties'])
+                    validate_properties(
+                        info['properties'],
+                        rhs[name]['properties']
+                    )
             return True
 
-        active_mapping = es.indices.get_mapping(index=index)
+        active_mapping = self.client.indices.get_mapping(index=index)
         document = active_mapping.get(index).get('mappings')
         return validate_properties(mapping.get('properties'),
                                    document.get('properties'))
@@ -252,12 +261,10 @@ class Search(FieldMappingMixin):
 
         mapping = self.get_mapping()
         index = self.get_index()
-        es = self.get_es()
 
         log_msg = "Updating mapping for index '{}': {}"
         logger.debug(log_msg.format(index, mapping))
-        es.indices.put_mapping(mapping,
-                               index=index)
+        self.client.indices.put_mapping(mapping, index=index)
 
     def get_base_qs(self):
         # Some objects have a default ordering, which only slows
@@ -287,7 +294,7 @@ class Search(FieldMappingMixin):
         if self.get_qs().filter(pk=instance.pk).exists():
             try:
                 logger.debug("Indexing instance '{}'".format(instance))
-                self.get_es().index(
+                self.client.index(
                     index=self.get_index(),
                     id=instance.pk,
                     body=self.prepare(instance)
@@ -302,7 +309,7 @@ class Search(FieldMappingMixin):
             try:
                 instance_repr = '{} ({})'.format(instance.__class__.__name__, instance.pk)
                 logger.debug("Un-indexing instance {}".format(instance_repr))
-                self.get_es().delete(
+                self.client.delete(
                     index=self.get_index(),
                     id=instance.pk,
                     ignore=404
@@ -316,7 +323,6 @@ class Search(FieldMappingMixin):
 
     def index_qs(self, qs):
         index = self.get_index()
-        es = self.get_es()
 
         if not qs.exists():
             logger.info("Bulk index request received for empty queryset. Skipping.")
@@ -334,8 +340,8 @@ class Search(FieldMappingMixin):
                          '_source': self.prepare(instance)}
                         for instance in chunk.iterator()
                     ]
-                    responses.append(bulk(client=es, actions=tuple(actions)))
-                    es.indices.refresh(index=index)
+                    responses.append(bulk(client=self.client, actions=tuple(actions)))
+                    self.client.indices.refresh(index=index)
                 except BulkIndexError as e:
                     logger.error("Failure during bulk index: {}".format(e))
                 except exceptions.ConnectionTimeout as exc:
@@ -355,8 +361,8 @@ class Search(FieldMappingMixin):
                      '_source': self.prepare(instance)}
                     for instance in qs.iterator()
                 ]
-                response = bulk(client=es, actions=tuple(actions))
-                es.indices.refresh(index=index)
+                response = bulk(client=self.client, actions=tuple(actions))
+                self.client.indices.refresh(index=index)
                 return response
             except BulkIndexError as e:
                 logger.error("Failure during bulk index: {}".format(e))
@@ -369,7 +375,6 @@ class Search(FieldMappingMixin):
 
     def bulk_clear(self):
         index = self.get_index()
-        es = self.get_es()
 
         try:
             actions = [{'_index': index,
@@ -378,13 +383,12 @@ class Search(FieldMappingMixin):
                        for hit in self.get_search()]
             log_msg = "Removing all {} instances from {})."
             logger.info(log_msg.format(len(actions), index))
-            return bulk(client=es, actions=tuple(actions))
+            return bulk(client=self.client, actions=tuple(actions))
         except BulkIndexError as e:
             logger.error("Failure during bulk clear: {}".format(e))
 
     def bulk_prune(self):
         index = self.get_index()
-        es = self.get_es()
 
         pruned = self.model.objects.difference(self.get_qs())
         qs = self.model.objects.filter(pk__in=pruned.values_list('pk', flat=True))
@@ -402,7 +406,7 @@ class Search(FieldMappingMixin):
                         for instance in chunk.iterator()
                     ]
                     logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
-                    responses.append(bulk(client=es, actions=tuple(actions)))
+                    responses.append(bulk(client=self.client, actions=tuple(actions)))
                 except BulkIndexError as e:
                     logger.warning("Failure during bulk prune: {}".format(e))
             return responses
@@ -419,7 +423,7 @@ class Search(FieldMappingMixin):
                     for instance in qs.iterator()
                 ]
                 logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
-                return bulk(client=es, actions=tuple(actions))
+                return bulk(client=self.client, actions=tuple(actions))
             except BulkIndexError as e:
                 logger.warning("Failure during bulk prune: {}".format(e))
 
