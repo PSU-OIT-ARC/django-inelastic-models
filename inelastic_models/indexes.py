@@ -301,7 +301,7 @@ class Search(FieldMappingMixin):
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Index request for '{}' timed out."
-                logger.warning(mgs.format(instance))
+                logger.warning(msg.format(instance))
             except exceptions.ConnectionError as exc:
                 msg = "Index request for '{}' encountered a connection error."
                 logger.warning(msg.format(instance))
@@ -316,7 +316,7 @@ class Search(FieldMappingMixin):
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Unindex request for '{}' timed out."
-                logger.warning(mgs.format(instance))
+                logger.warning(msg.format(instance))
             except exceptions.ConnectionError as exc:
                 msg = "Unindex request for '{}' encountered a connection error."
                 logger.warning(msg.format(instance))
@@ -346,7 +346,7 @@ class Search(FieldMappingMixin):
                     logger.error("Failure during bulk index: {}".format(e))
                 except exceptions.ConnectionTimeout as exc:
                     msg = "Bulk index request timed out."
-                    logger.warning(mgs.format(instance))
+                    logger.warning(msg.format(instance))
                 except exceptions.ConnectionError as exc:
                     msg = "Bulk index request encountered a connection error."
                     logger.warning(msg.format(instance))
@@ -368,7 +368,7 @@ class Search(FieldMappingMixin):
                 logger.error("Failure during bulk index: {}".format(e))
             except exceptions.ConnectionTimeout as exc:
                 msg = "Bulk index request timed out."
-                logger.warning(mgs.format(instance))
+                logger.warning(msg.format(instance))
             except exceptions.ConnectionError as exc:
                 msg = "Bulk index request encountered a connection error."
                 logger.warning(msg.format(instance))
