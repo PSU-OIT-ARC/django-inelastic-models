@@ -179,7 +179,7 @@ class Search(FieldMappingMixin):
             logger.warning("Deleting index '{}'".format(index))
             self.client.indices.delete(index)
 
-        logger.debug("Creating index '{}'".format(index))
+        logger.info("Creating index '{}'".format(index))
         self.client.indices.create(index)
         self.client.indices.refresh(index=index)
         self.client.cluster.health(wait_for_status='yellow')
@@ -198,7 +198,7 @@ class Search(FieldMappingMixin):
         index_settings = config.pop('index', {})
         if index_settings and index_settings.get('number_of_replicas', None) is not None:
             log_msg = "Setting number_of_replicas={} on '{}'"
-            logger.debug(log_msg.format(index_settings.get('number_of_replicas'), index))
+            logger.info(log_msg.format(index_settings.get('number_of_replicas'), index))
             replica_settings = {
                 'index': {
                     'number_of_replicas': index_settings.pop('number_of_replicas')
