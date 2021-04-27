@@ -114,7 +114,9 @@ class Search(FieldMappingMixin):
 
     @classmethod
     def as_field(cls, attr, model, field_type):
-        field = field_type(
+        class _inner(field_type):
+            mapping_type = 'object'
+        field = _inner(
             attr,
             model=model,
             attribute_fields=cls.attribute_fields,
