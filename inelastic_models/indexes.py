@@ -237,10 +237,9 @@ class Search(FieldMappingMixin):
                 if name not in rhs:
                     return False
 
-                # !!! FIXME !!!
-                # migrate_index triggers a key error for 'type'
-                # (fix migrate?)
-                if info['type'] != rhs[name]['type']:
+                # the default mapping_type is 'object' and is not explicitly
+                # given as the 'type' parameter of 'properties'.
+                if info.get('type', 'object') != rhs[name].get('type', 'object'):
                     return False
                 if 'properties' in info:
                     validate_properties(
