@@ -6,7 +6,6 @@ from django_dynamic_fixture import G
 from django.core.management import call_command
 from django import test
 
-from inelastic_models.utils.indexes import refresh_search_indexes
 from inelastic_models.models.test import Model, ModelSearch
 from inelastic_models.receivers import suspended_updates
 from .base import SearchBaseTestCase
@@ -77,7 +76,6 @@ class CreateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
         super().check_command_response(
             response, **kwargs)
 
-        refresh_search_indexes()
         self.assertEqual(Model.search.count(), 1)
 
 
@@ -89,7 +87,6 @@ class UpdateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
             response, **kwargs)
 
         G(Model, name='Test2')
-        refresh_search_indexes()
         self.assertEqual(Model.search.count(), 2)
 
 
@@ -115,6 +112,5 @@ class MigrateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
     def check_command_response(self, response, **kwargs):
         super().check_command_response(response, **kwargs)
 
-        refresh_search_indexes()
         self.assertEqual(Model.search.query('match', ngram='Test').count(), 2)
         self.assertEqual(Model.search.query('match', new_field='Hack the Gibson.').count(), 1)

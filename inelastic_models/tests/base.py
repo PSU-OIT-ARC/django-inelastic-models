@@ -3,11 +3,12 @@ from django.test.runner import DiscoverRunner
 
 from inelastic_models.models.test import Model, SearchFieldModel
 from inelastic_models.receivers import get_search_models
-from inelastic_models.utils.indexes import (refresh_search_indexes,
-                                            clear_search_indexes)
 
 
 class SearchTestRunner(DiscoverRunner):
+    """
+    TBD
+    """
     def setup_test_environment(self, **kwargs):
         super().setup_test_environment(**kwargs)
 
@@ -22,8 +23,8 @@ class SearchBaseTestCase(object):
     def _pre_setup(self):
         super()._pre_setup()
 
-        clear_search_indexes()
-        refresh_search_indexes()
+        for model in get_search_models():
+            model._search_meta().bulk_clear()
 
     def create_instance(self, **kwargs):
         params = {'test_list': None, 'test_m2m': []}

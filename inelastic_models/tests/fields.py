@@ -1,14 +1,11 @@
 import datetime
 
 import elasticsearch.exceptions
-
 from django_dynamic_fixture import G
 from django import test
 
-from inelastic_models.utils.indexes import refresh_search_indexes
 from inelastic_models.models.test import Model, SearchFieldModel
-
-from .base import SearchBaseTestCase
+from inelastic_models.tests.base import SearchBaseTestCase
 
 
 class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
@@ -35,8 +32,6 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
         tsfm.model_set.add(tm)
         tsfm.model_set.add(tm2)
         tsfm.save()
-
-        refresh_search_indexes()
 
     def test_attribute_field(self):
         self.assertEqual(Model.search.count(), 2)
