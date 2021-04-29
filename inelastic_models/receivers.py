@@ -111,4 +111,4 @@ def suspended_updates(models=None, permanent=False):
             search_meta = model._search_meta()
             if model in models or models.intersection(search_meta.dependencies):
                 qs = search_meta.get_qs(since=start)
-                search_meta.index_qs(qs)
+                search_meta.bulk_index(qs)

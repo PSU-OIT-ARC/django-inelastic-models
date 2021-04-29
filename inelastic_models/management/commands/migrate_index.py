@@ -21,4 +21,4 @@ class Command(IndexCommand):
         search.put_mapping()
 
         logger.info("(Re-)Indexing mapping '{}'...".format(index))
-        search.index_qs(queryset)
+        search.bulk_index(queryset)

@@ -320,7 +320,13 @@ class Search(FieldMappingMixin):
                 msg = "Unindex request for '{}' encountered a connection error."
                 logger.warning(msg.format(instance))
 
-    def index_qs(self, qs):
+    def set_index_refresh(self, index, state):
+        index_settings = {'index': {'refresh_interval': None if state else "-1"}}
+        self.client.indices.put_settings(index_settings, index=index)
+        if not state:
+            self.client.indices.forcemerge(index=index)
+
+    def bulk_index(self, qs):
         index = self.get_index()
 
         if not qs.exists():
@@ -365,12 +371,11 @@ class Search(FieldMappingMixin):
                      '_source': self.prepare(instance)}
                     for instance in qs.iterator()
                 ]
-                response = bulk(
+                return bulk(
                     client=self.client,
                     actions=tuple(actions),
                     params={'refresh': 'true'}
                 )
-                return response
             except BulkIndexError as e:
                 logger.error("Failure during bulk index: {}".format(e))
             except exceptions.ConnectionTimeout as exc:
@@ -393,16 +398,27 @@ class Search(FieldMappingMixin):
             return bulk(
                 client=self.client,
                 actions=tuple(actions),
+                ignore=404,
                 params={'refresh': 'true'}
             )
         except BulkIndexError as e:
             logger.error("Failure during bulk clear: {}".format(e))
+        except exceptions.ConnectionTimeout as exc:
+            msg = "Bulk clear request timed out."
+            logger.warning(msg.format(instance))
+        except exceptions.ConnectionError as exc:
+            msg = "Bulk clear request encountered a connection error."
+            logger.warning(msg.format(instance))
 
     def bulk_prune(self):
         index = self.get_index()
 
         pruned = self.model.objects.difference(self.get_qs())
         qs = self.model.objects.filter(pk__in=pruned.values_list('pk', flat=True))
+
+        if not qs.exists():
+            logger.info("Bulk prune request has no objects to remove. Skipping.")
+            return None
 
         try:
             assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
@@ -416,22 +432,25 @@ class Search(FieldMappingMixin):
                          '_id': instance.pk}
                         for instance in chunk.iterator()
                     ]
-                    logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
                     responses.append(
                         bulk(
                             client=self.client,
                             actions=tuple(actions),
+                            ignore=404,
                             params={'refresh': 'true'}
                         )
                     )
                 except BulkIndexError as e:
                     logger.warning("Failure during bulk prune: {}".format(e))
+                except exceptions.ConnectionTimeout as exc:
+                    msg = "Bulk prune request timed out."
+                    logger.warning(msg.format(instance))
+                except exceptions.ConnectionError as exc:
+                    msg = "Bulk prune request encountered a connection error."
+                    logger.warning(msg.format(instance))
+
             return responses
         except AssertionError:
-            if not qs.count():
-                logger.info("No objects to prune")
-                return None
-
             try:
                 actions = [
                     {'_index': index,
@@ -439,14 +458,20 @@ class Search(FieldMappingMixin):
                      '_source': self.prepare(instance)}
                     for instance in qs.iterator()
                 ]
-                logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
                 return bulk(
                     client=self.client,
                     actions=tuple(actions),
+                    ignore=404,
                     params={'refresh': 'true'}
                 )
             except BulkIndexError as e:
                 logger.warning("Failure during bulk prune: {}".format(e))
+            except exceptions.ConnectionTimeout as exc:
+                msg = "Bulk prune request timed out."
+                logger.warning(msg.format(instance))
+            except exceptions.ConnectionError as exc:
+                msg = "Bulk prune request encountered a connection error."
+                logger.warning(msg.format(instance))
 
 
 class SearchDescriptor:
