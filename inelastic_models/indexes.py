@@ -181,8 +181,6 @@ class Search(FieldMappingMixin):
 
         logger.info("Creating index '{}'".format(index))
         self.client.indices.create(index)
-        self.client.indices.refresh(index=index)
-        self.client.cluster.health(wait_for_status='yellow')
 
     def configure_index(self):
         """
@@ -206,7 +204,6 @@ class Search(FieldMappingMixin):
             }
             self.client.indices.open(index)
             self.client.indices.put_settings(replica_settings, index=index)
-            self.client.indices.refresh(index=index)
 
             if len(index_settings):
                 config.update(index_settings)
@@ -223,7 +220,6 @@ class Search(FieldMappingMixin):
             logger.debug("No settings to update for index '{}'".format(index))
         finally:
             self.client.indices.open(index)
-            self.client.indices.refresh(index=index)
 
     def check_mapping(self):
         mapping = self.get_mapping()
@@ -298,7 +294,8 @@ class Search(FieldMappingMixin):
                 self.client.index(
                     index=self.get_index(),
                     id=instance.pk,
-                    body=self.prepare(instance)
+                    body=self.prepare(instance),
+                    params={'refresh': 'true'}
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Index request for '{}' timed out."
@@ -313,7 +310,8 @@ class Search(FieldMappingMixin):
                 self.client.delete(
                     index=self.get_index(),
                     id=instance.pk,
-                    ignore=404
+                    ignore=404,
+                    params={'refresh': 'true'}
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Unindex request for '{}' timed out."
@@ -341,8 +339,13 @@ class Search(FieldMappingMixin):
                          '_source': self.prepare(instance)}
                         for instance in chunk.iterator()
                     ]
-                    responses.append(bulk(client=self.client, actions=tuple(actions)))
-                    self.client.indices.refresh(index=index)
+                    responses.append(
+                        bulk(
+                            client=self.client,
+                            actions=tuple(actions),
+                            params={'refresh': 'true'}
+                        )
+                    )
                 except BulkIndexError as e:
                     logger.error("Failure during bulk index: {}".format(e))
                 except exceptions.ConnectionTimeout as exc:
@@ -362,8 +365,11 @@ class Search(FieldMappingMixin):
                      '_source': self.prepare(instance)}
                     for instance in qs.iterator()
                 ]
-                response = bulk(client=self.client, actions=tuple(actions))
-                self.client.indices.refresh(index=index)
+                response = bulk(
+                    client=self.client,
+                    actions=tuple(actions),
+                    params={'refresh': 'true'}
+                )
                 return response
             except BulkIndexError as e:
                 logger.error("Failure during bulk index: {}".format(e))
@@ -378,13 +384,17 @@ class Search(FieldMappingMixin):
         index = self.get_index()
 
         try:
-            actions = [{'_index': index,
-                        '_op_type' : 'delete',
-                        '_id': hit.pk}
-                       for hit in self.get_search()]
+            actions = [
+                {'_index': index, '_op_type' : 'delete', '_id': hit.pk}
+                for hit in self.get_search()
+            ]
             log_msg = "Removing all {} instances from {})."
-            logger.info(log_msg.format(len(actions), index))
-            return bulk(client=self.client, actions=tuple(actions))
+            logger.debug(log_msg.format(len(actions), index))
+            return bulk(
+                client=self.client,
+                actions=tuple(actions),
+                params={'refresh': 'true'}
+            )
         except BulkIndexError as e:
             logger.error("Failure during bulk clear: {}".format(e))
 
@@ -407,7 +417,13 @@ class Search(FieldMappingMixin):
                         for instance in chunk.iterator()
                     ]
                     logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
-                    responses.append(bulk(client=self.client, actions=tuple(actions)))
+                    responses.append(
+                        bulk(
+                            client=self.client,
+                            actions=tuple(actions),
+                            params={'refresh': 'true'}
+                        )
+                    )
                 except BulkIndexError as e:
                     logger.warning("Failure during bulk prune: {}".format(e))
             return responses
@@ -424,7 +440,11 @@ class Search(FieldMappingMixin):
                     for instance in qs.iterator()
                 ]
                 logger.info("Pruning {} {} instances.".format(qs.count(), self.model.__name__))
-                return bulk(client=self.client, actions=tuple(actions))
+                return bulk(
+                    client=self.client,
+                    actions=tuple(actions),
+                    params={'refresh': 'true'}
+                )
             except BulkIndexError as e:
                 logger.warning("Failure during bulk prune: {}".format(e))
 
