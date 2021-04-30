@@ -92,7 +92,6 @@ class AwareResult(dsl.response.Hit):
 class Search(FieldMappingMixin):
     connection = getattr(settings, 'ELASTICSEARCH_DEFAULT_CONNECTION', 'default')
     date_field = 'modified_on'
-    index_by = CHUNKSIZE
 
     # A dictionary whose keys are other models that this model's index
     # depends on, and whose values are query set paramaters for this model
@@ -326,6 +325,10 @@ class Search(FieldMappingMixin):
         if not state:
             self.client.indices.forcemerge(index=index)
 
+    def get_chunksize(self, queryset):
+        chunk_factor = getattr(settings, 'ELASTICSEARCH_INDEX_CHUNK_FACTOR', 20)
+        return CHUNKSIZE * max(1, int(queryset.count() / (CHUNKSIZE * chunk_factor)))
+
     def bulk_index(self, qs):
         index = self.get_index()
 
@@ -334,10 +337,13 @@ class Search(FieldMappingMixin):
             return None
 
         try:
-            assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
+            assert qs.count() > CHUNKSIZE, "Falling back to non-chunked indexing."
+
+            chunksize = self.get_chunksize(qs)
+            logger.info("Using chunk size of '{}'".format(chunksize))
 
             responses = []
-            for chunk in queryset_iterator(qs, chunksize=self.index_by):
+            for chunk in queryset_iterator(qs, chunksize=chunksize):
                 try:
                     actions = [
                         {'_index': index,
@@ -421,10 +427,13 @@ class Search(FieldMappingMixin):
             return None
 
         try:
-            assert qs.count() > self.index_by, "Falling back to non-chunked indexing."
+            assert qs.count() > CHUNKSIZE, "Falling back to non-chunked indexing."
+
+            chunksize = self.get_chunksize(qs)
+            logger.info("Using chunk size of '{}'".format(chunksize))
 
             responses = []
-            for chunk in queryset_iterator(qs, chunksize=self.index_by):
+            for chunk in queryset_iterator(qs, chunksize=chunksize):
                 try:
                     actions = [
                         {'_index': index,
