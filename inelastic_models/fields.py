@@ -155,7 +155,7 @@ class StringField(AttributeField):
         return str(value) or ""
 
 
-class KeywordField(StringField):
+class CharField(StringField):
     mapping_type = 'keyword'
 
     def get_normalizer(self):
@@ -166,19 +166,11 @@ class KeywordField(StringField):
         )
 
 
-class CharField(StringField):
+class TextField(StringField):
     mapping_type = 'text'
 
-    def get_analyzer(self):
-        return (
-            'keyword_analyzer', {
-                'tokenizer': 'keyword',
-                'filter': ['trim', 'lowercase']
-            }
-        )
 
-
-class TranslationField(CharField):
+class TranslationField(TextField):
     def __init__(self, attr, *args, **kwargs):
         self.language_name = kwargs.pop('language', None)
         super().__init__(attr, *args, **kwargs)
@@ -188,10 +180,6 @@ class TranslationField(CharField):
         if self.language_name is not None:
             mapping['analyzer'] = self.language_name
         return mapping
-
-
-class TextField(StringField):
-    mapping_type = 'text'
 
 
 class NGramField(StringField):
@@ -266,7 +254,8 @@ class ListField(AttributeField):
         return list(str(i) for i in instance)
 
 
-class KeywordListField(ListField):
+# class KeywordListField(ListField):
+class CharListField(ListField):
     mapping_type = 'keyword'
 
 
@@ -340,13 +329,13 @@ class FieldMappingMixin:
             elif isinstance(field, models.TextField):
                 return (name, TextField(attr=attr))
             else:
-                return (name, KeywordField(attr=attr))
+                return (name, CharField(attr=attr))
 
         except models.FieldDoesNotExist:
-            return (name, KeywordField(attr=attr))
+            return (name, CharField(attr=attr))
         except AttributeError as exc:
             if not hasattr(self, 'model'):
-                return (name, KeywordField(attr=attr))
+                return (name, CharField(attr=attr))
             raise exc
 
     def get_fields(self):
