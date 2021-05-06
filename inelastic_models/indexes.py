@@ -147,10 +147,13 @@ class Search(FieldMappingMixin):
         return "{}_{}".format(self.model._meta.app_label, self.model._meta.model_name)
 
     def get_field_type(self, fieldname):
-        field = self.get_mapping()['properties'].get(fieldname, None)
-        if field is None:
-            return None
-        return field['type']
+        mapping = self.get_mapping()
+        for field in fieldname.split('.'):
+            mapping = mapping['properties'].get(field, None)
+            if mapping is None:
+                return None
+
+        return mapping['type']
 
     def get_dependencies(self):
         dependencies = self.dependencies.copy()
