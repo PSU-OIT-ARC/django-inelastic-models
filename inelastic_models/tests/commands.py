@@ -73,8 +73,7 @@ class CreateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
     command_name = 'create_index'
 
     def check_command_response(self, response, **kwargs):
-        super().check_command_response(
-            response, **kwargs)
+        super().check_command_response(response, **kwargs)
 
         self.assertEqual(Model.search.count(), 1)
 
@@ -82,11 +81,15 @@ class CreateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
 class UpdateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
     command_name = 'update_index'
 
-    def check_command_response(self, response, **kwargs):
-        super().check_command_response(
-            response, **kwargs)
+    def setUp(self):
+        super().setUp()
 
-        G(Model, name='Test2')
+        with suspended_updates(models=[Model], permanent=True):
+            G(Model, name='Test2')
+
+    def check_command_response(self, response, **kwargs):
+        super().check_command_response(response, **kwargs)
+
         self.assertEqual(Model.search.count(), 2)
 
 
@@ -96,8 +99,6 @@ class PruneIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
 
     def check_command_response(self, response, **kwargs):
         super().check_command_response(response, **kwargs)
-
-        # todo:
 
 
 class MigrateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):

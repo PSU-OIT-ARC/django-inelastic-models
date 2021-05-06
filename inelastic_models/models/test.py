@@ -1,11 +1,10 @@
 from django.db import models
 
 from ..indexes import SearchMixin, Search
-from ..fields import (KeywordField,
-                      CharField,
+from ..fields import (CharField,
                       TextField,
                       NGramField,
-                      KeywordListField,
+                      CharListField,
                       ObjectField,
                       MultiObjectField)
 
@@ -39,8 +38,6 @@ class Model(SearchMixin, models.Model):
 class ModelSearch(Search):
     attribute_fields = ['name', 'date', 'email', 'count_m2m']
     other_fields = {
-        'keyword': KeywordField('name'),
-        'char': CharField('name'),
         'text': TextField('name'),
         'ngram': NGramField('name'),
     }
@@ -67,7 +64,7 @@ class SearchFieldModel(SearchMixin, models.Model):
 
 class SearchFieldModelSearch(Search):
     other_fields = {
-        'model_list': KeywordListField('models'),
+        'model_list': CharListField('models'),
         'related': ObjectField(
             'related',
             model=Model,

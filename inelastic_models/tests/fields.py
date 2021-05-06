@@ -70,32 +70,22 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
         self.assertIn('Test1 one two three', hit_names)
         self.assertIn('Test2 four five six', hit_names)
 
-    def test_keyword_field(self):
-        query = Model.search.query('term', keyword="Test1")
+    def test_char_field(self):
+        query = Model.search.query('term', name="Test1")
         self.assertEqual(len(query.execute().hits), 0)
 
-        query = Model.search.query('match', keyword="Test1")
+        query = Model.search.query('match', name="Test1")
         self.assertEqual(len(query.execute().hits), 0)
 
-        query = Model.search.query('term', keyword="Test1 one two three")
+        query = Model.search.query('term', name="Test1 one two three")
         self.assertEqual(len(query.execute().hits), 1)
 
         query = Model.search
-        query.aggs.bucket('keyword', 'terms', field='keyword')
+        query.aggs.bucket('keyword', 'terms', field='name')
         self.assertNotEqual(query.execute().aggregations.to_dict(), {})
 
-    def test_char_field(self):
-        query = Model.search.query('match', email='test1@example.com')
-        self.assertEqual(len(query.execute().hits), 1)
-
         mapping = Model._search_meta().get_mapping()
-        self.assertFalse('tokenizer' in mapping['properties']['email'])
-
-        # text mapping types don't support aggregations, sorting
-        with self.assertRaises(elasticsearch.exceptions.TransportError):
-            query = Model.search
-            query.aggs.bucket('char', 'terms', field='char')
-            query.execute()
+        self.assertFalse('tokenizer' in mapping['properties']['name'])
 
     def test_text_field(self):
         query = Model.search.query('match', text='one four')
