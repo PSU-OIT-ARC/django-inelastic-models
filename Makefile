@@ -30,7 +30,7 @@ test: init  ## Run tests
 test-container: init  ## Run tests in a container
 	$(docker-compose) up -d elasticsearch
 	$(docker-compose) build test
-	$(docker-compose) run test make test venv=.env-test
+	$(docker-compose) run --rm test make test venv=.env-test
 	# sudo rm -rf .env-test
 
 upload-dist: venv_update=true
