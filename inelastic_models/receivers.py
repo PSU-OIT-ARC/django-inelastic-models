@@ -1,4 +1,4 @@
-import threading
+import importlib
 import logging
 
 from contextlib import contextmanager
@@ -11,6 +11,7 @@ from django.utils.timezone import now
 from django.core.cache import caches
 from django.dispatch import receiver
 from django.db.models import signals
+from django.conf import settings
 from django.apps import apps
 
 from .utils import merge
@@ -68,13 +69,22 @@ def update_search_index(sender, **kwargs):
     # Gathering and handling of dependents is performed first in order to support
     # indexed models which list non-indexed models as dependency triggers.
     dependents = merge([instance._search_dependents, get_dependents(instance)])
+    handler = getattr(settings, 'ELASTICSEARCH_DEPENDENCY_HANDLER', None)
 
     for model, qs in dependents.items():
-        search_meta = model._search_meta()
-        for record in qs.iterator():
-            # !!! TODO !!!
-            # Why aren't we using 'record.index()'?
-            search_meta.index_instance(record)
+        if handler is not None:
+            logger.debug("Using dependency handler '{}' for indexing...".format(handler))
+            for record in qs.iterator():
+                (handler_module, handler_name) = handler.rsplit(sep='.', maxsplit=1)
+                module = importlib.import_module(handler_module)
+                func = getattr(module, handler_name)
+                func(None, instance=record)
+        else:
+            search_meta = model._search_meta()
+            for record in qs.iterator():
+                # !!! TODO !!!
+                # Why aren't we using 'record.index()'?
+                search_meta.index_instance(record)
 
     # Guards indexing by validating the given model has been bound to an
     # index type and that this type is not currently suspended.
