@@ -41,8 +41,11 @@ def get_dependents(instance):
     for model in get_search_models():
         search_meta = model._search_meta()
         dependencies = search_meta.get_dependencies()
-        if type(instance) in dependencies:
-            filter_kwargs = {dependencies[type(instance)]: instance}
+        for dep_type in dependencies:
+            if not isinstance(instance, dep_type):
+                continue
+
+            filter_kwargs = {dependencies[dep_type]: instance}
             qs = search_meta.model.objects.filter(**filter_kwargs)
             dependents[model] = qs
 
