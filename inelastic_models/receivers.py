@@ -65,19 +65,27 @@ def update_search_index(sender, **kwargs):
     search_models = get_search_models()
     instance = kwargs['instance']
 
-    if not isinstance(instance, sender):
-        sender = type(instance)
-    if sender not in search_models or _is_suspended(sender):
-        logger.debug("Skipping indexing for '%s'" % (sender))
-        return
-
-    instance.index()
-    
+    # Gathering and handling of dependents is performed first in order to support
+    # indexed models which list non-indexed models as dependency triggers.
     dependents = merge([instance._search_dependents, get_dependents(instance)])
+
     for model, qs in dependents.items():
         search_meta = model._search_meta()
         for record in qs.iterator():
+            # !!! TODO !!!
+            # Why aren't we using 'record.index()'?
             search_meta.index_instance(record)
+
+    # Guards indexing by validating the given model has been bound to an
+    # index type and that this type is not currently suspended.
+    if not isinstance(instance, sender):
+        sender = type(instance)
+    if sender not in search_models or _is_suspended(sender):
+        logger.debug("Skipping indexing for '{}'".format(sender))
+        return
+
+    logger.debug("Indexing instance '{}'".format(instance))
+    instance.index()
 
 
 @receiver(signals.m2m_changed)
