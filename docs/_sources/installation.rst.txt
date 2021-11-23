@@ -1,0 +1,140 @@
+============
+Installation
+============
+
+Before getting started, ensure that you have the standard Python tools available on your system and that you've
+installed a recent version of the ``virtualenv`` package.
+
+.. note:: The following commands assume that you are in the top-level directory.
+
+Makefile, drivers, wrappers; oh my!
+-----------------------------------
+
+This project employs ``make`` in order to standardize and simplify configuration, provisioning and management.
+
+To see the supported list of commands, execute make with no parameters.
+
+.. hint:: In general, all commands accept the *venv*, *venv_python* and *venv_update* parameters. The release workflows, by default, are
+          bound to a separate Python2 virtual environment and it is unlikely this configuration will need to be overridden.
+
+A wrapper is provided in ``bin`` in order to simplify the use in the codebase of multiple entry points. This script
+wraps the ``django-admin.py`` driver, allowing for specification of an entry point. *E.g.*::
+
+    ./bin/manage -e my runserver
+    ./bin/manage -e backend shell
+
+Please note that the calling convention requires an entry-point argument *-e*::
+
+    user@foo:~/bar/webapps/oro$ ./bin/manage
+    usage: manage [-h] -e ENTRY_POINT cmd [cmd ...]
+    manage: error: argument -e/--entry-point is required
+
+Supported environments
+----------------------
+
+Docker
+======
+
+Although it is not required, Docker is the recommended and supported development environment. Unless you're
+using a custom-configured environment, familiarize yourself `Docker Engine`_ and `Docker Compose`_.
+
+.. _Docker Engine: https://docs.docker.com/engine/
+.. _Docker Compose: https://docs.docker.com/compose/
+
+Initialize, fetch and launch the application and service containers as well as their environment by executing::
+
+    user@foo:~/bar/webapps/oro$ make init
+    user@foo:~/bar/webapps/oro$ source .env/bin/activate
+    user@foo:~/bar/webapps/oro$ docker-compose up -d
+
+Before continuing, you should understand the basic concepts behind Docker containers. You should also
+understand basic administration and interaction commands for containers::
+
+    user@foo:~/bar/webapps/oro$ docker-compose ps
+    user@foo:~/bar/webapps/oro$ docker-compose create --force-recreate oro
+    user@foo:~/bar/webapps/oro$ docker-compose start oro
+    user@foo:~/bar/webapps/oro$ docker-compose exec oro /bin/bash
+
+Inspect ``docker-compose.yml`` to review the configured networks, volumes and services. By default,
+access to these services will be restricted to containers running in the network created during
+``docker-compose`` initialization.
+
+Your working directory will be exported to the container as::
+
+    /webapps/oro/
+
+To use the default hostnames provided in the Apache virtual host configuration, bind the bridge interface
+address to the host names by editing your ``hosts`` file::
+
+    [bridge ip] backend.oro.local
+    [bridge ip] calendar.oro.local
+    [bridge ip] centralrepository.oro.local
+    [bridge ip] my.oro.local
+    [bridge ip] staff.oro.local
+
+Tex Live
+========
+
+Some functionality requires the availability of a TeX live environment. In order to build an environment, the
+``bin/build_texlive`` script is provided.
+
+In your host environment (native or Vagrant; the Docker container construction will handle binding to your
+environment itself), execute this script with no arguments::
+
+    user@foo:~/bar/webapps/oro$ ./bin/texlive build
+
+Configuration
+-------------
+
+There are a few additional steps required to assemble a complete project configuration after cloning the
+repository.
+
+Depending on the context, to avoid ``HTTP 400 Bad Request`` responses and to ensure proper session function,
+you must provide the appropriate domain configuration:
+
+.. code-block:: python
+
+    ALLOWED_HOSTS = ['.oro.local']
+    SESSION_COOKIE_DOMAIN = '.oro.local'
+
+Services
+========
+
+In general, if you've used Docker to boostrap your environment you'll only need to modify the defined host of
+the required application services:
+
+.. code-block:: python
+
+    import socket
+    ...
+    HOSTNAME == socket.gethostname()
+    ...
+    if HOSTNAME == 'your-hostname':
+        DATABASES['default']['HOST'] = '192.168.1.1'
+        CACHES['default']['LOCATION'] = '192.168.1.1:6379:1'
+        ELASTICSEARCH_CONNECTIONS['default']['HOSTS'] = ['192.168.1.1:9200']
+        CELERY_BROKER_URL = 'pyamqp://guest:guest@192.168.1.1//'
+
+Subsystems
+==========
+
+If you've built a TeX live environment as described above, set the path accordingly in order to exercise
+functionality and avoid skipping tests which rely on it:
+
+.. code-block:: python
+
+    import os.path
+    ...
+    TEXLIVE_BIN_ROOT = os.path.join(FILE_ROOT, 'texlive', '2016', 'bin', 'x86_64-linux')
+
+Exercise various other in-project subsystems with no default configuration in your development environment:
+
+.. code-block:: python
+
+    import os.path
+    ...
+    DOCUMENT_FETCH_DIRS = {'supporting_documentation': os.path.join(FILE_ROOT, 'fetch_root')}
+    DOCUMENT_PROCESS_DIRS = {'supporting_documentation': os.path.join(FILE_ROOT, 'process_root')}
+    PRERENDER_TEMPLATES = ['maintenance.html', 'critical.html']
+    TEMPLATE_FEATURES = {'sentry_feedback': True}
+    RAVEN_CONFIG = {...}

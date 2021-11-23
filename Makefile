@@ -23,6 +23,19 @@ init:  ## Install primary application dependencies, creating a virtualenv if nec
             $(bin)/pip install .[test]; \
         fi
 
+documentation: venv_release='.env-release'
+documentation:  ## Builds the currently available documentation.
+	@if [ -d ".env-release" ]; then \
+            echo "virtualenv '.env-release' exists"; \
+        else \
+            $(venv_python) -m venv .env-release || exit -1; \
+            $(venv_release)/bin/pip install --upgrade pip wheel; \
+            $(venv_release)/bin/pip install .[dev]; \
+        fi
+	@cp README.rst docs/source/introduction.rst
+	@cp CHANGELOG.rst docs/source/changelog.rst
+	@$(venv_release)/bin/sphinx-build -b html docs/source docs/
+
 #test: venv_update=true
 test: init  ## Run tests
 	$(venv)/bin/python runtests.py
