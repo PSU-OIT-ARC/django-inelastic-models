@@ -1,9 +1,8 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
+import datetime
+import logging
+import copy
 
 import dateutil
-import logging
-import six
 
 from django.template.loader import render_to_string
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -16,55 +15,96 @@ from .utils import merge
 logger = logging.getLogger(__name__)
 
 
-class SearchField(object):
-    mapping = None
-    mapping_type = 'string'
-    index = None #Set to 'analyzed' 'not_analyzed' or 'no'
+class SearchField:
+    mapping_type = None
+    index = True
 
-    def __init__(self, *args, **kwargs):
-        if 'index' in kwargs:
-            self.index = kwargs.pop('index')
+    def get_analyzer(self):
+        return (None, {})
 
-        super(SearchField, self).__init__(*args, **kwargs)
+    def get_tokenizer(self):
+        return (None, {})
+
+    def get_normalizer(self):
+        return (None, {})
+
+    def get_filter(self):
+        return (None, {})
 
     def get_field_mapping(self):
-        if self.mapping is not None:
-            return self.mapping
-
         mapping = {'type': self.mapping_type}
-        if self.index is not None:
-            mapping['index'] = self.index
+        if self.index is False:
+            mapping['index'] = False
+
+        (a_name, _) = self.get_analyzer()
+        if a_name is not None:
+            mapping['analyzer'] = a_name
+
+        (n_name, _) = self.get_normalizer()
+        if n_name is not None:
+            mapping['normalizer'] = n_name
 
         return mapping
 
     def get_field_settings(self):
-        return {}
+        settings = {}
+
+        (t_name, t_def) = self.get_tokenizer()
+        if t_def:
+            settings['tokenizer'] = dict([(t_name, t_def)])
+
+        (a_name, a_def) = self.get_analyzer()
+        if a_def:
+            settings['analyzer'] = dict([(a_name, a_def)])
+
+        (n_name, n_def) = self.get_normalizer()
+        if n_def:
+            settings['normalizer'] = dict([(n_name, n_def)])
+
+        (f_name, f_def) = self.get_filter()
+        if f_def:
+            settings['filter'] = dict([(f_name, f_def)])
+
+        if not settings:
+            return settings
+
+        return {'analysis': settings}
 
     def get_from_instance(self, instance):
         return None
 
+
 class TemplateField(SearchField):
+    mapping_type = 'text'
+
     def __init__(self, template_name):
+        super().__init__()
+
         self.template_name = template_name
-        super(TemplateField, self).__init__(*args, **kwargs)
 
     def get_from_instance(self, instance):
-        context = {'object': self.instance}
+        context = {'object': instance}
         return render_to_string(template_name, context)
 
-class EmailURLAllField(SearchField):
+
+class KitchenSinkField(SearchField):
+    """
+    A field type to be used as a replacement for the deprecated '_all' field.
+    """
+    mapping_type = 'text'
+
     def get_field_settings(self):
-        settings = super(EmailURLAllField, self).get_field_settings()
+        settings = super().get_field_settings()
         settings = merge([settings, {
             'analysis': {
                 'analyzer': {
-                    'email_url_analyzer': {
-                        'tokenizer': 'email_url_tokenizer',
-                        'filter': ['lowercase'],
+                    'kitchen_sink_analyzer': {
+                        'tokenizer': 'kitchen_sink_tokenizer',
+                        'filter': ['lowercase', ],
                     }
                 },
                 'tokenizer': {
-                    'email_url_tokenizer' : {
+                    'kitchen_sink_tokenizer' : {
                         'type': 'uax_url_email',
                     }
                 },
@@ -74,14 +114,17 @@ class EmailURLAllField(SearchField):
         return settings
 
     def get_field_mapping(self):
-        mapping = super(EmailURLAllField, self).get_field_mapping()
-        mapping['analyzer'] = 'email_url_analyzer'
+        mapping = super().get_field_mapping()
+        mapping['analyzer'] = 'kitchen_sink_analyzer'
         return mapping
 
+
 class AttributeField(SearchField):
-    def __init__(self, attr, *args, **kwargs):
+    def __init__(self, attr, exclude_from_all_field=False):
+        super().__init__()
+
         self.path = attr.split(".")
-        super(AttributeField, self).__init__(*args, **kwargs)
+        self.exclude_from_all_field = exclude_from_all_field
 
     def get_from_instance(self, instance):
         for attr in self.path:
@@ -104,123 +147,165 @@ class AttributeField(SearchField):
     def to_python(self, value):
         return value
 
+
 class StringField(AttributeField):
     def get_from_instance(self, instance):
-        value = super(StringField, self).get_from_instance(instance)
+        value = super().get_from_instance(instance)
         if value is not None and callable(value):
             value = value()
-        return six.text_type(value) or ""
+        return str(value) or ""
 
-class TranslationField(StringField):
+
+class CharField(StringField):
+    mapping_type = 'keyword'
+
+    def get_normalizer(self):
+        return (
+            'keyword_normalizer', {
+                'filter': ['trim', 'lowercase']
+            }
+        )
+
+
+class TextField(StringField):
+    mapping_type = 'text'
+
+
+class TranslationField(TextField):
     def __init__(self, attr, *args, **kwargs):
         self.language_name = kwargs.pop('language', None)
-        super(TranslationField, self).__init__(attr, *args, **kwargs)
+        super().__init__(attr, *args, **kwargs)
 
     def get_field_mapping(self):
-        mapping = super(TranslationField, self).get_field_mapping()
+        mapping = super().get_field_mapping()
         if self.language_name is not None:
             mapping['analyzer'] = self.language_name
         return mapping
 
 
 class NGramField(StringField):
+    mapping_type = 'text'
     min_gram = 2
     max_gram = 4
 
     def __init__(self, *args, **kwargs):
         if 'min_gram' in kwargs:
             self.min_gram = kwargs.pop('min_gram')
-
         if 'max_gram' in kwargs:
             self.max_gram = kwargs.pop('max_gram')
 
-        super(NGramField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-    def get_analyzer_name(self):
-        return "ngram_analyzer_%d_%d" % (self.min_gram, self.max_gram)
+    def get_filter(self):
+        name = "ngram_filter_{}_{}".format(self.min_gram, self.max_gram)
+        return (name, {'type': 'ngram',
+                       'min_gram': self.min_gram,
+                       'max_gram': self.max_gram,
+                       'token_chars': ["letter", "digit"]})
 
-    def get_field_mapping(self):
-        mapping = super(NGramField, self).get_field_mapping()
-        mapping['analyzer'] = self.get_analyzer_name()
-        return mapping
+    def get_analyzer(self):
+        (t_name, _) = self.get_tokenizer()
+        name = "ngram_analyzer_{}_{}".format(self.min_gram, self.max_gram)
+        filter_name = "ngram_filter_{}_{}".format(self.min_gram, self.max_gram)
+        return (name, {'tokenizer': "standard",
+                       'filter': [filter_name]})
 
-    def get_field_settings(self):
-        settings = super(NGramField, self).get_field_settings()
-        analyzer_name = self.get_analyzer_name()
-        tokenizer_name = "ngram_tokenizer_%d_%d" % (self.min_gram, self.max_gram)
-
-        settings = merge([settings, {
-            'analysis': {
-                'analyzer': {
-                    analyzer_name: {
-                        'tokenizer': tokenizer_name,
-                        'filter': ['lowercase'],
-                    }
-                },
-                'tokenizer': {
-                    tokenizer_name : {
-                        'type': 'nGram',
-                        'min_gram': self.min_gram,
-                        'max_gram': self.max_gram,
-                        'token_chars': [ "letter", "digit" ]
-                    }
-                },
-            }
-        }])
-
-        return settings
-
-class MultiField(AttributeField):
-    def get_from_instance(self, instance):
-        manager = super(MultiField, self).get_from_instance(instance)
-        return self.render(manager)
-
-    def render(self, manager):
-        return "\n".join(six.text_type(i) for i in manager.all())
-
-class ListField(MultiField):
-    def render(self, manager):
-        return list(six.text_type(i) for i in manager.all())
 
 class IntegerField(AttributeField):
     mapping_type = 'integer'
 
+
+class FloatField(AttributeField):
+    mapping_type = 'float'
+
+
+class DecimalField(AttributeField):
+    mapping_type = 'double'
+
+
 class BooleanField(AttributeField):
     mapping_type = 'boolean'
+
 
 class DateField(AttributeField):
     mapping_type = 'date'
 
     def to_python(self, value):
-        if isinstance(value, six.text_type):
+        if isinstance(value, str):
             return dateutil.parser.parse(value).date()
-        return value
 
-class FieldMappingMixin(object):
+        return super().to_python(value)
+
+
+class DurationField(AttributeField):
+    mapping_type = 'unsigned_long'
+
+    def to_python(self, value):
+        return value.total_seconds
+
+
+class ListField(AttributeField):
+    def get_from_instance(self, instance):
+        instance = super().get_from_instance(instance)
+        if instance is None:
+            return {}
+
+        if hasattr(instance, 'all'):
+            instance = instance.all()
+        return list(str(i) for i in instance)
+
+
+# class KeywordListField(ListField):
+class CharListField(ListField):
+    mapping_type = 'keyword'
+
+
+class TextListField(ListField):
+    mapping_type = 'text'
+
+
+class MultiField(AttributeField):
+    mapping_type = 'text'
+
+
+class RenderedAttributeField(AttributeField):
+    mapping_type = 'text'
+
+    def get_from_instance(self, instance):
+        reference = super().get_from_instance(instance)
+        return self.render(reference)
+
+    def render(self, manager):
+        raise NotImplementedError
+
+
+class FieldMappingMixin:
     attribute_fields = ()
     template_fields = ()
     other_fields = {}
 
+    use_all_field = getattr(settings, 'ELASTICSEARCH_USE_ALL_FIELD', False)
+    all_field_name = getattr(settings, 'ELASTICSEARCH_ALL_FIELD_NAME', '_all')
+    index_ordering = getattr(settings, 'ELASTICSEARCH_INDEX_ORDERING', None)
+
     def __init__(self, *args, **kwargs):
         if 'model' in kwargs:
             self.model = kwargs.pop('model')
-
         if 'attribute_fields' in kwargs:
             self.attribute_fields = kwargs.pop('attribute_fields')
-
         if 'template_fields' in kwargs:
             self.template_fields = kwargs.pop('template_fields')
-
         if 'other_fields' in kwargs:
             self.other_fields = kwargs.pop('other_fields')
 
-        super(FieldMappingMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_attr_field(self, attr):
         # Figure out if the attribute is a model field, and if so, use it to
         # determine the search index field type.
         path = attr.split(".")
         name = path[-1]
+
         try:
             model = self.model
             for a in path[:-1]:
@@ -229,23 +314,29 @@ class FieldMappingMixin(object):
 
             if isinstance(field, models.BooleanField):
                 return (name, BooleanField(attr=attr))
-            elif isinstance(field, models.IntegerField):
+            elif isinstance(field, (models.ForeignKey,
+                                    models.IntegerField)):
                 return (name, IntegerField(attr=attr))
+            elif isinstance(field, models.FloatField):
+                return (name, FloatField(attr=attr))
+            elif isinstance(field, models.DecimalField):
+                return (name, DecimalField(attr=attr))
             elif isinstance(field, models.DateField):
                 return (name, DateField(attr=attr))
-            elif isinstance(field, models.EmailField):
-                return (name, StringField(attr=attr, index='not_analyzed'))
-            elif isinstance(field, models.ManyToManyField) or \
-                 isinstance(field, ForeignObjectRel):
-                return (name, MultiField(attr=attr))
+            elif isinstance(field, models.DurationField):
+                return (name, DurationField(attr=attr))
+            elif isinstance(field, models.CharField):
+                return (name, CharField(attr=attr))
+            elif isinstance(field, models.TextField):
+                return (name, TextField(attr=attr))
             else:
-                return (name, StringField(attr=attr))
+                return (name, CharField(attr=attr))
 
         except models.FieldDoesNotExist:
-            return (name, StringField(attr=attr))
+            return (name, CharField(attr=attr))
         except AttributeError as exc:
             if not hasattr(self, 'model'):
-                return (name, StringField(attr=attr))
+                return (name, CharField(attr=attr))
             raise exc
 
     def get_fields(self):
@@ -269,48 +360,68 @@ class FieldMappingMixin(object):
 
     def get_index_settings(self):
         connection_info = settings.ELASTICSEARCH_CONNECTIONS[self.connection]
-        config = connection_info.get('INDEX_OPTIONS', {})
-        logger.debug("Using configuration: %s" % (config))
+        options = copy.deepcopy(connection_info.get('INDEX_OPTIONS', {}))
 
-        if not config:
-            return {'index': {}}
-        return {'index': {
-            'number_of_replicas': config.get('number_of_replicas', 1)}}
+        if options.get('number_of_replicas', None) is None:
+            options.update({'number_of_replicas': 1})
+
+        logger.debug("Using index configuration: {}".format(options))
+        return {'index': options}
 
     def get_settings(self):
         return merge([f.get_field_settings() for f in self.get_fields().values()])
 
     def get_mapping(self):
-        properties = dict((name, field.get_field_mapping())
-                          for name, field in list(self.get_fields().items()))
-        mapping = {'properties': properties}
-        return mapping
+        properties = {}
+
+        for name, field in self.get_fields().items():
+            mapping = field.get_field_mapping()
+            if all([
+                    self.use_all_field,
+                    not field.exclude_from_all_field,
+                    'properties' not in mapping
+            ]):
+                mapping['copy_to'] = self.all_field_name
+            properties[name] = mapping
+
+        return {'properties': properties}
 
     def prepare(self, instance):
         return dict((name, field.get_from_instance(instance))
                     for name, field in list(self.get_fields().items()))
 
-class ObjectField(FieldMappingMixin, AttributeField):
+
+class ObjectFieldMixin(FieldMappingMixin):
+    def get_field_mapping(self):
+        mapping = super().get_field_mapping()
+        mapping.update(self.get_mapping())
+        return mapping
+
+    def get_field_settings(self):
+        settings = super().get_field_settings()
+        settings = merge([settings, self.get_settings()])
+        return settings
+
+    
+class ObjectField(ObjectFieldMixin, AttributeField):
     mapping_type = 'object'
 
-    def get_field_mapping(self):
-        mapping = super(ObjectField, self).get_field_mapping()
-        mapping.update(self.get_mapping())
-        return mapping
-
     def get_from_instance(self, instance):
-        instance = super(ObjectField, self).get_from_instance(instance)
+        instance = super().get_from_instance(instance)
+        if instance is None:
+            return {}
+
         return self.prepare(instance)
 
-class MultiObjectField(FieldMappingMixin, MultiField):
-    """ a list of dictionaries """
+
+class MultiObjectField(ObjectFieldMixin, AttributeField):
     mapping_type = 'nested'
 
-    def get_field_mapping(self):
-        mapping = super(MultiObjectField, self).get_field_mapping()
-        mapping.update(self.get_mapping())
-        return mapping
+    def get_from_instance(self, instance):
+        instance = super().get_from_instance(instance)
+        if instance is None:
+            return []
 
-    def render(self, manager):
-        object_list = []
-        return [self.prepare(i) for i in manager.all()]
+        if hasattr(instance, 'all'):
+            instance = instance.all()
+        return [self.prepare(i) for i in instance]

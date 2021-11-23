@@ -29,6 +29,9 @@ settings.configure(
         'default': {
             'HOSTS': [ELASTICSEARCH_HOST],
             'INDEX_NAME': 'inelastic_models',
+            'INDEX_OPTIONS': {
+                'max_ngram_diff': 2
+            }
         }
     },
     TEMPLATES=[{
@@ -44,11 +47,7 @@ settings.configure(
     }]
 )
 
-if VERSION[:2] >= (1, 7):
-    from django import setup
-else:
-    setup = lambda: None
-
+from django import setup
 setup()
 
 

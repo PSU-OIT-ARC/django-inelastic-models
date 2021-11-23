@@ -1,19 +1,30 @@
 version: '3'
+
 networks:
   default:
     driver: bridge
 
 services:
   elasticsearch:
-    image: elasticsearch:2
+    image: elasticsearch:7.12.0
     networks:
       - default
     ports:
-      - "127.0.0.1:9200:9200"
+      - "9200:9200"
+    environment:
+      - cluster.name=inelastic_models
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+    mem_limit: 2g
+    mem_swappiness: 0
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
 
   test:
     build:
-      context: .
+      context: docker
     networks:
       - default
     volumes:

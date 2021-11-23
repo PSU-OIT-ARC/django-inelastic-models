@@ -1,18 +1,17 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
-import threading
+import importlib
 import logging
-import six
 
 from contextlib import contextmanager
 from datetime import timedelta
+
+import elasticsearch.exceptions
 
 from django.utils.lru_cache import lru_cache
 from django.utils.timezone import now
 from django.core.cache import caches
 from django.dispatch import receiver
 from django.db.models import signals
+from django.conf import settings
 from django.apps import apps
 
 from .utils import merge
@@ -27,6 +26,7 @@ suspended_models = []
 def get_search_models():
     return [m for m in apps.get_models() if issubclass(m, SearchMixin)]
 
+
 def _is_suspended(model):
     global suspended_models
 
@@ -36,17 +36,22 @@ def _is_suspended(model):
 
     return False
 
+
 def get_dependents(instance):
     dependents = {}
     for model in get_search_models():
         search_meta = model._search_meta()
         dependencies = search_meta.get_dependencies()
-        if type(instance) in dependencies:
-            filter_kwargs = {dependencies[type(instance)]: instance}
+        for dep_type in dependencies:
+            if not isinstance(instance, dep_type):
+                continue
+
+            filter_kwargs = {dependencies[dep_type]: instance}
             qs = search_meta.model.objects.filter(**filter_kwargs)
             dependents[model] = qs
 
     return dependents
+
 
 @receiver(signals.pre_save)
 @receiver(signals.pre_delete)
@@ -54,25 +59,44 @@ def collect_dependents(sender, **kwargs):
     instance = kwargs['instance']
     instance._search_dependents = get_dependents(instance)
 
+
 @receiver(signals.post_delete)
 @receiver(signals.post_save)
 def update_search_index(sender, **kwargs):
     search_models = get_search_models()
     instance = kwargs['instance']
 
+    # Gathering and handling of dependents is performed first in order to support
+    # indexed models which list non-indexed models as dependency triggers.
+    dependents = merge([instance._search_dependents, get_dependents(instance)])
+    handler = getattr(settings, 'ELASTICSEARCH_DEPENDENCY_HANDLER', None)
+
+    for model, qs in dependents.items():
+        if handler is not None:
+            logger.debug("Using dependency handler '{}' for indexing...".format(handler))
+            for record in qs.iterator():
+                (handler_module, handler_name) = handler.rsplit(sep='.', maxsplit=1)
+                module = importlib.import_module(handler_module)
+                func = getattr(module, handler_name)
+                func(None, instance=record)
+        else:
+            search_meta = model._search_meta()
+            for record in qs.iterator():
+                # !!! TODO !!!
+                # Why aren't we using 'record.index()'?
+                search_meta.index_instance(record)
+
+    # Guards indexing by validating the given model has been bound to an
+    # index type and that this type is not currently suspended.
     if not isinstance(instance, sender):
         sender = type(instance)
     if sender not in search_models or _is_suspended(sender):
-        logger.debug("Skipping indexing for '%s'" % (sender))
+        logger.debug("Skipping indexing for '{}'".format(sender))
         return
 
+    logger.debug("Indexing instance '{}'".format(instance))
     instance.index()
 
-    dependents = merge([instance._search_dependents, get_dependents(instance)])
-    for model, qs in six.iteritems(dependents):
-        search_meta = model._search_meta()
-        for record in qs.iterator():
-            search_meta.index_instance(record)
 
 @receiver(signals.m2m_changed)
 def handle_m2m(sender, **kwargs):
@@ -80,6 +104,7 @@ def handle_m2m(sender, **kwargs):
         collect_dependents(kwargs['model'], **kwargs)
     else:
         update_search_index(kwargs['model'], **kwargs)
+
 
 @contextmanager
 def suspended_updates(models=None, permanent=False):
@@ -107,4 +132,4 @@ def suspended_updates(models=None, permanent=False):
             search_meta = model._search_meta()
             if model in models or models.intersection(search_meta.dependencies):
                 qs = search_meta.get_qs(since=start)
-                search_meta.index_qs(qs)
+                search_meta.bulk_index(qs)

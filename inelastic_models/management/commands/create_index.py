@@ -1,6 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import logging
 
 from inelastic_models.management.commands import IndexCommand
@@ -15,8 +12,9 @@ class Command(IndexCommand):
     help = 'Creates and populates the search index.  If it already exists, it is deleted first.'
 
     def handle_operation(self, search, queryset):
-        logger.info("Creating mapping for {}".format(search.model.__name__))
+        index = search.get_index()
+        logger.info("Creating mapping {} for {}".format(index, search.model.__name__))
         search.put_mapping()
 
         logger.info("Indexing {} {} objects".format(queryset.count(), search.model.__name__))
-        search.index_qs(queryset)
+        search.bulk_index(queryset)
