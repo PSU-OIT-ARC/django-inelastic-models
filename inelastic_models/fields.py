@@ -120,10 +120,11 @@ class KitchenSinkField(SearchField):
 
 
 class AttributeField(SearchField):
-    def __init__(self, attr):
+    def __init__(self, attr, exclude_from_all_field=False):
         super().__init__()
 
         self.path = attr.split(".")
+        self.exclude_from_all_field = exclude_from_all_field
 
     def get_from_instance(self, instance):
         for attr in self.path:
@@ -375,7 +376,11 @@ class FieldMappingMixin:
 
         for name, field in self.get_fields().items():
             mapping = field.get_field_mapping()
-            if all([self.use_all_field, 'properties' not in mapping]):
+            if all([
+                    self.use_all_field,
+                    not field.exclude_from_all_field,
+                    'properties' not in mapping
+            ]):
                 mapping['copy_to'] = self.all_field_name
             properties[name] = mapping
 
