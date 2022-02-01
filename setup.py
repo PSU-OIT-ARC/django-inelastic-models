@@ -13,7 +13,7 @@ setup(
     install_requires=[
         'elasticsearch~=7.0',
         'elasticsearch-dsl~=7.0',
-        'django>2.2,<3.0'
+        'django>2.2,<4.0'
     ],
     extras_require={
         'dev': [
