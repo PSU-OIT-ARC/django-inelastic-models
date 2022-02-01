@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en-US" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Introduction &mdash; Django Inelastic Models 7.0.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -73,12 +72,12 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="introduction">
+  <div class="section" id="introduction">
 <h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
 <p>This package provides a small library for declaratively specifying indexes for <a class="reference external" href="https://docs.djangoproject.org">Django</a> models
 using an <a class="reference external" href="https://www.elastic.co/products/elasticsearch">Elasticsearch</a> backend.</p>
 <p>It requires Django, <a class="reference external" href="https://github.com/elastic/elasticsearch-dsl-py">elasticsearch-dsl</a> and an available Elasticsearch instance.</p>
-<section id="usage">
+<div class="section" id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
 <ol class="arabic">
 <li><p>Add <code class="docutils literal notranslate"><span class="pre">inelastic_models</span></code> to <code class="docutils literal notranslate"><span class="pre">INSTALLED_APPS</span></code>.</p></li>
@@ -112,8 +111,8 @@ to the generated indices and the underlying <code class="docutils literal notran
 <span class="p">},</span>
 </pre></div>
 </div>
-</section>
-<section id="tests">
+</div>
+<div class="section" id="tests">
 <h2>Tests<a class="headerlink" href="#tests" title="Permalink to this headline">¶</a></h2>
 <p>Run tests using the <code class="docutils literal notranslate"><span class="pre">make</span></code> rule:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">make</span> <span class="n">test</span> <span class="p">[</span><span class="n">venv</span><span class="o">=&lt;</span><span class="n">path</span><span class="o">&gt;</span><span class="p">]</span> <span class="p">[</span><span class="n">python</span><span class="o">=&lt;</span><span class="n">python</span> <span class="n">executable</span> <span class="n">name</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="p">,</span> <span class="s1">&#39;python3.5&#39;</span><span class="o">&gt;</span><span class="p">]</span>
@@ -121,8 +120,8 @@ to the generated indices and the underlying <code class="docutils literal notran
 </div>
 <p>It is assumed that you have and Elasticsearch index available at <code class="docutils literal notranslate"><span class="pre">elasticsearch:9200</span></code> and that
 <code class="docutils literal notranslate"><span class="pre">virtualenv</span></code> available on your path.</p>
-</section>
-</section>
+</div>
+</div>
 
 
            </div>
