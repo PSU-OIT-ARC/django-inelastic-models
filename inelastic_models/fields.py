@@ -332,7 +332,7 @@ class FieldMappingMixin:
             else:
                 return (name, CharField(attr=attr))
 
-        except models.FieldDoesNotExist:
+        except FieldDoesNotExist:
             return (name, CharField(attr=attr))
         except AttributeError as exc:
             if not hasattr(self, 'model'):
