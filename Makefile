@@ -1,56 +1,52 @@
-.DEFAULT_GOAL = help
+DEFAULT_GOAL = help
+.PHONY := help view-docs test
 
-venv ?= .env
-venv_python ?= python3
-venv_update = false
+SHELL=/bin/bash
+APP_ENV ?= ""
 
-bin = $(venv)/bin
-docker-compose = "`which docker-compose`"
+pipenv_python ?= python3
+pipenv = "`pipenv --venv`"
+pipenv_bin = "$(pipenv)/bin"
+ifneq ($(APP_ENV), "")
+  pipenv_bin = "$(APP_ENV)/bin"
+endif
+
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-init:  ## Install primary application dependencies, creating a virtualenv if necessary. Params: 'venv', 'venv_python', 'venv_autoinstall', 'venv_requirements', 'venv_update'
-	@if [ -d "$(venv)" ]; then \
-            echo "virtualenv '$(venv)' exists"; \
-            if [ $(venv_update) = true ]; then \
-                $(bin)/pip install --upgrade pip wheel; \
-                $(bin)/pip install .[test]; \
-            fi \
-        else \
-            $(venv_python) -m venv $(venv) || exit -1; \
-            $(bin)/pip install --upgrade pip wheel; \
-            $(bin)/pip install .[test]; \
-        fi
+install:  ## Installs project dependencies into pipenv
+	@pipenv --venv || (pipenv --python $(pipenv_python); pipenv install -e .[all])
 
-documentation: venv_release='.env-release'
-documentation:  ## Builds the currently available documentation.
-	@if [ -d ".env-release" ]; then \
-            echo "virtualenv '.env-release' exists"; \
-        else \
-            $(venv_python) -m venv .env-release || exit -1; \
-            $(venv_release)/bin/pip install --upgrade pip wheel; \
-            $(venv_release)/bin/pip install .[dev]; \
-        fi
+documentation: install  ## Builds the currently available documentation.
 	@cp README.rst docs/source/introduction.rst
 	@cp CHANGELOG.rst docs/source/changelog.rst
-	@$(venv_release)/bin/sphinx-build -b html docs/source docs/
+	@pipenv run sphinx-build -b html docs/source docs/
+	@pipenv run sphinx-build -b latex docs/source docs/build;
+	@cd docs/build; make all; cp inelastic_models.pdf ../assets/; cd ../../
 
-#test: venv_update=true
-test: init  ## Run tests
-	$(venv)/bin/python runtests.py
+view-docs: make_pdf=false
+view-docs: port=8000
+view-docs: documentation  ## Launches a Python HTTP server to view docs
+	@$(pipenv_bin)/python -m http.server --bind 0.0.0.0 --dir docs $(port)
 
-test-container: init  ## Run tests in a container
-	$(docker-compose) up -d elasticsearch
-	$(docker-compose) build test
-	$(docker-compose) run --rm test make test venv=.env-test
-	# sudo rm -rf .env-test
+update_pip_requirements:  ## Updates python dependencies
+	@echo "Updating Python release requirements..."; echo ""
+	@pipenv --venv || pipenv --python $(pipenv_python)
+	@pipenv check || echo "Review the above safety issues..."
+	@pipenv update --dev
+	@pipenv clean
+	@pipenv run pip list --outdated
+	@pipenv lock --dev --requirements > docker/requirements.txt
 
-upload-dist: venv_update=true
-upload-dist: clean init ## Builds and uploads distribution
-	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(venv) bash -
+test:  ## Run tests
+	@$(pipenv_bin)/python runtests.py
 
-clean:  ## Removes generated junk
-	@rm -r build || echo "No build artifacts to remove..."
-	@rm -r dist || echo "No archives to remove..."
-	@rm -r *.egg-info || echo "No eggs to remove..."
+test-container: install  ## Run tests in a container
+	docker-compose up -d elasticsearch
+	docker-compose build test
+	docker-compose run --rm test make test
+
+upload-dist: install  ## Builds and uploads distribution
+	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(pipenv) bash -
+	rm dist/*.whl
