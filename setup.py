@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='DjangoInelasticModels',
-    version='7.0.0',
+    version='7.1.0',
     author='Thom Linton',
     author_email='tlinton@pdx.edu',
     url='https://github.com/PSU-OIT-ARC/django-inelastic-models',
@@ -13,12 +13,12 @@ setup(
     install_requires=[
         'elasticsearch~=7.0',
         'elasticsearch-dsl~=7.0',
-        'django>2.2,<3.0'
+        'django>2.2,<4.0'
     ],
     extras_require={
         'dev': [
             'textile~=4.0.0',
-            'Sphinx~=4.3.0',
+            'Sphinx~=5.0.0',
             'sphinx_rtd_theme~=1.0.0'
         ],
         'test': [
@@ -32,7 +32,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Topic :: Software Development :: Build Tools',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',

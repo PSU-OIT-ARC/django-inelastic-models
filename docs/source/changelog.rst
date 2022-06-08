@@ -2,6 +2,13 @@
 Changelog
 =========
 
+7.1
+---
+
+2022-06-08
+
+This release requires the use of the Django 3.2 LTS.
+
 7.0
 ---
 

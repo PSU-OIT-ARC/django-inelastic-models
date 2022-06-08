@@ -1,3 +1,4 @@
+import functools
 import importlib
 import logging
 
@@ -6,7 +7,6 @@ from datetime import timedelta
 
 import elasticsearch.exceptions
 
-from django.utils.lru_cache import lru_cache
 from django.utils.timezone import now
 from django.core.cache import caches
 from django.dispatch import receiver
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 suspended_models = []
 
 
-@lru_cache()
+@functools.lru_cache()
 def get_search_models():
     return [m for m in apps.get_models() if issubclass(m, SearchMixin)]
 
