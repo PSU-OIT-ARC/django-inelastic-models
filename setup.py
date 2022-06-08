@@ -18,7 +18,7 @@ setup(
     extras_require={
         'dev': [
             'textile~=4.0.0',
-            'Sphinx~=4.4.0',
+            'Sphinx~=5.0.0',
             'sphinx_rtd_theme~=1.0.0'
         ],
         'test': [
