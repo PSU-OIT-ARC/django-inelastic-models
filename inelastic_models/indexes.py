@@ -364,11 +364,9 @@ class Search(FieldMappingMixin):
                 except BulkIndexError as e:
                     logger.error("Failure during bulk index: {}".format(e))
                 except exceptions.ConnectionTimeout as exc:
-                    msg = "Bulk index request timed out."
-                    logger.warning(msg.format(instance))
+                    logger.warning("Bulk index request timed out.")
                 except exceptions.ConnectionError as exc:
-                    msg = "Bulk index request encountered a connection error."
-                    logger.warning(msg.format(instance))
+                    logger.warning("Bulk index request encountered a connection error.")
 
             return responses
 
@@ -388,11 +386,9 @@ class Search(FieldMappingMixin):
             except BulkIndexError as e:
                 logger.error("Failure during bulk index: {}".format(e))
             except exceptions.ConnectionTimeout as exc:
-                msg = "Bulk index request timed out."
-                logger.warning(msg.format(instance))
+                logger.warning("Bulk index request timed out.")
             except exceptions.ConnectionError as exc:
-                msg = "Bulk index request encountered a connection error."
-                logger.warning(msg.format(instance))
+                logger.warning("Bulk index request encountered a connection error.")
 
     def bulk_clear(self):
         index = self.get_index()
