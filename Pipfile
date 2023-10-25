@@ -4,8 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-elasticsearch = "~=7.0"
-elasticsearch_dsl = "~=7.0"
+elasticsearch = "~=8.0"
+elasticsearch_dsl = "~=8.0"
 django = "~=3.2"
 
 [dev-packages]
