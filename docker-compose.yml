@@ -10,7 +10,7 @@ networks:
 
 services:
   elasticsearch:
-    image: elasticsearch:8.4.1
+    image: elasticsearch:8.10.2
     networks:
       - default
     ports:
