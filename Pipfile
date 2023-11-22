@@ -4,12 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+python-dateutil = "~=2.8.0"
 elasticsearch = "~=8.0"
 elasticsearch_dsl = "~=8.0"
 django = "~=3.2"
 
 [dev-packages]
 textile = "~=4.0.0"
-Sphinx = "~=5.0.0"
-sphinx_rtd_theme = "~=1.0.0"
-django-dynamic-fixture = "*"
+Sphinx = "~=7.2.0"
+sphinx_rtd_theme = "~=1.3.0"
+tblib = "~=3.0.0"
+coverage = "~=7.3.0"
+django-dynamic-fixture = "~=4.0.0"
