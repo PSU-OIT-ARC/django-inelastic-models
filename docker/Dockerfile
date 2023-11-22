@@ -1,4 +1,4 @@
-FROM python:3.9-bullseye
+FROM python:3.11-bookworm
 MAINTAINER Thom Linton <tlinton@pdx.edu>
 
 
@@ -8,7 +8,7 @@ RUN apt-get update && \
         python3-venv
 
 # Set build arguments
-ARG APP_PYTHON=python3.9
+ARG APP_PYTHON=python3.11
 ARG APP_ENV=/opt/venv
 
 # Export build arguments as environment variables
