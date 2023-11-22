@@ -48,5 +48,6 @@ test-container: install  ## Run tests in a container
 	docker-compose run --rm test make test
 
 upload-dist: install  ## Builds and uploads distribution
-	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(pipenv) bash -
-	rm dist/*.whl
+	@rm -r ./build  # clean any existing build path assets
+	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(pipenv) BUILD_TYPE=bdist_wheel bash -
+	@rm -rf ./*.egg-info
