@@ -2,6 +2,13 @@
 Changelog
 =========
 
+8.0
+---
+
+2023-11-22
+
+This release adds support for, and requires, the use of ES 8.x.
+
 7.1
 ---
 
