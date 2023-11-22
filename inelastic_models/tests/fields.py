@@ -92,7 +92,7 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
         self.assertEqual(len(query.execute().hits), 2)
 
         # text mapping types don't support aggregations, sorting
-        with self.assertRaises(elasticsearch.exceptions.TransportError):
+        with self.assertRaises(elasticsearch.exceptions.BadRequestError):
             query = Model.search
             query.aggs.bucket('text', 'terms', field='text')
             query.execute()

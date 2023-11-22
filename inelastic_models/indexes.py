@@ -66,13 +66,14 @@ def queryset_iterator(queryset, chunksize=CHUNKSIZE):
     logger.info("Iterated {} records".format(total))
 
 
-class AwareResult(dsl.response.Hit):
+class TypeAwareSerializableHit(dsl.response.Hit):
     def __init__(self, document, search_meta):
         super().__init__(document)
 
         for name, field in search_meta.get_fields().items():
             if name not in self:
                 continue
+
             self[name] = field.to_python(self[name])
 
             # Support query result serialization (e.g., JSON) by translating
@@ -86,6 +87,7 @@ class AwareResult(dsl.response.Hit):
     def make_callback(cls, search_meta):
         def callback(document):
             return cls(document, search_meta)
+        callback._matches = lambda x: True
         return callback
 
 
@@ -168,7 +170,7 @@ class Search(FieldMappingMixin):
     def get_search(self):
         s = dsl.Search(using=self.client)
         s = s.index(self.get_index())
-        return s.doc_type(**{'_doc': AwareResult.make_callback(self)})
+        return s.doc_type(TypeAwareSerializableHit.make_callback(self))
 
     def create_index(self):
         """
@@ -177,12 +179,12 @@ class Search(FieldMappingMixin):
         index = self.get_index()
         es = get_client(self.connection)
 
-        if self.client.indices.exists(index):
+        if self.client.indices.exists(index=index):
             logger.debug("Deleting index '{}'".format(index))
-            self.client.indices.delete(index)
+            self.client.indices.delete(index=index)
 
         logger.debug("Creating index '{}'".format(index))
-        self.client.indices.create(index)
+        self.client.indices.create(index=index)
 
     def configure_index(self):
         """
@@ -204,8 +206,8 @@ class Search(FieldMappingMixin):
                     'number_of_replicas': index_settings.pop('number_of_replicas')
                 }
             }
-            self.client.indices.open(index)
-            self.client.indices.put_settings(replica_settings, index=index)
+            self.client.indices.open(index=index)
+            self.client.indices.put_settings(settings=replica_settings, index=index)
 
             if len(index_settings):
                 config.update(index_settings)
@@ -213,15 +215,15 @@ class Search(FieldMappingMixin):
                 settings = merge([config, settings])
 
         try:
-            self.client.indices.close(index)
+            self.client.indices.close(index=index)
             logger.debug("Updating settings for index '{}': {}".format(index, settings))
-            self.client.indices.put_settings(settings, index=index)
+            self.client.indices.put_settings(settings=settings, index=index)
         except exceptions.RequestError as e:
             if settings:
                 raise e
             logger.debug("No settings to update for index '{}'".format(index))
         finally:
-            self.client.indices.open(index)
+            self.client.indices.open(index=index)
 
     def check_mapping(self):
         mapping = self.get_mapping()
@@ -263,7 +265,7 @@ class Search(FieldMappingMixin):
 
         log_msg = "Updating mapping for index '{}': {}"
         logger.debug(log_msg.format(index, mapping))
-        self.client.indices.put_mapping(mapping, index=index)
+        self.client.indices.put_mapping(**mapping, index=index)
 
     def get_base_qs(self):
         # Some objects have a default ordering, which only slows
@@ -324,7 +326,7 @@ class Search(FieldMappingMixin):
 
     def set_index_refresh(self, index, state):
         index_settings = {'index': {'refresh_interval': None if state else "-1"}}
-        self.client.indices.put_settings(index_settings, index=index)
+        self.client.indices.put_settings(settings=index_settings, index=index)
         if not state:
             self.client.indices.forcemerge(index=index)
 
