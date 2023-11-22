@@ -33,7 +33,8 @@ services:
 
   test:
     build:
-      context: docker
+      context: .
+      dockerfile: docker/Dockerfile
     networks:
       - default
     volumes:

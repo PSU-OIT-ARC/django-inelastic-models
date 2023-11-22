@@ -33,11 +33,11 @@ view-docs: documentation  ## Launches a Python HTTP server to view docs
 update_pip_requirements:  ## Updates python dependencies
 	@echo "Updating Python release requirements..."; echo ""
 	@pipenv --venv || pipenv --python $(pipenv_python)
-	@pipenv check || echo "Review the above safety issues..."
+	@pipenv check || (echo "Review the above safety issues..." && exit 1)
 	@pipenv update --dev
+	@pipenv verify || (echo "Verification failed!" && exit 1)
 	@pipenv clean
 	@pipenv run pip list --outdated
-	@pipenv lock --dev --requirements > docker/requirements.txt
 
 test:  ## Run tests
 	@$(pipenv_bin)/python runtests.py
