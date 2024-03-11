@@ -4,10 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-python-dateutil = "~=2.8.0"
+python-dateutil = ">=2.8.0,<3.0"
 elasticsearch = "~=8.0"
 elasticsearch_dsl = "~=8.0"
-django = "~=3.2"
+django = "~3.2"
 
 [dev-packages]
 textile = "~=4.0.0"

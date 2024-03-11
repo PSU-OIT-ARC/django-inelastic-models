@@ -103,7 +103,7 @@ classifiers = [  # Optional
 # For an analysis of this field vs pip's requirements files see:
 # https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [ # Optional
-  'python-dateutil ~= 2.8.0',
+  'python-dateutil >= 2.8.0, <3.0',
   'elasticsearch ~= 8.0',
   'elasticsearch_dsl ~= 8.0',
   'django ~= 3.2'
