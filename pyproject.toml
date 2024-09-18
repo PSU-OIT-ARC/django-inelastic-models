@@ -106,7 +106,7 @@ dependencies = [ # Optional
   'python-dateutil >= 2.8.0, <3.0',
   'elasticsearch ~= 8.0',
   'elasticsearch_dsl ~= 8.0',
-  'django ~= 3.2'
+  'django >= 3.2, <5.0'
 ]
 
 # List additional groups of dependencies here (e.g. development
