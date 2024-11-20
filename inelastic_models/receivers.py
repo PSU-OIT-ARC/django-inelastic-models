@@ -5,43 +5,56 @@ import logging
 from contextlib import contextmanager
 from datetime import timedelta
 
-import elasticsearch.exceptions
-
 from django.utils.timezone import now
-from django.core.cache import caches
 from django.dispatch import receiver
 from django.db.models import signals
 from django.conf import settings
 from django.apps import apps
 
-from .utils import merge
 from .indexes import SearchMixin
+from .utils import merge
 
-SUSPENSION_BUFFER_TIME = timedelta(seconds=10)
+SUSPENDED_MODELS = []
+
 logger = logging.getLogger(__name__)
-suspended_models = []
 
 
 @functools.lru_cache()
 def get_search_models():
-    return [m for m in apps.get_models() if issubclass(m, SearchMixin)]
+    """
+    TBD
+    """
+    return [
+        m for m in apps.get_models()
+        if issubclass(m, SearchMixin)
+    ]
 
 
-def _is_suspended(model):
-    global suspended_models
+@functools.lru_cache()
+def get_handler():
+    """
+    TBD
+    """
+    handler_path = getattr(settings, 'ELASTICSEARCH_INDEX_HANDLER', None)
+    if handler_path is None:
+        return None
 
-    for models in suspended_models:
-        if model in models:
-            return True
-
-    return False
+    logger.debug("Using dependency handler '{}'...".format(handler_path))
+    (handler_module, handler_name) = handler.rsplit(sep='.', maxsplit=1)
+    module = importlib.import_module(handler_module)
+    return getattr(module, handler_name)
 
 
 def get_dependents(instance):
+    """
+    TBD
+    """
     dependents = {}
+
     for model in get_search_models():
         search_meta = model._search_meta()
         dependencies = search_meta.get_dependencies()
+
         for dep_type in dependencies:
             if not isinstance(instance, dep_type):
                 continue
@@ -53,53 +66,93 @@ def get_dependents(instance):
     return dependents
 
 
+def is_suspended(sender, instance):
+    """
+    TBD
+    """
+    global SUSPENDED_MODELS
+
+    if sender is None or not isinstance(instance, sender):
+        sender = type(instance)
+    for models in SUSPENDED_MODELS:
+        if sender in models:
+            return True
+
+    return False
+
+
+def is_indexed(sender, instance):
+    """
+    TBD
+    """
+    search_models = get_search_models()
+
+    if sender is None or not isinstance(instance, sender):
+        sender = type(instance)
+    if sender not in search_models:
+        return False
+
+    return True
+
+
 @receiver(signals.pre_save)
 @receiver(signals.pre_delete)
 def collect_dependents(sender, **kwargs):
+    """
+    TBD
+    """
     instance = kwargs['instance']
+
+    # Guards indexing by validating the given model has been bound to an
+    # index type and that this type is not currently suspended.
+    if not is_indexed(sender, instance) or is_suspended(sender, instance):
+        logger.debug("Skipping pre-indexing task for '{}'".format(sender))
+        return
+
     instance._search_dependents = get_dependents(instance)
 
 
 @receiver(signals.post_delete)
 @receiver(signals.post_save)
 def update_search_index(sender, **kwargs):
-    search_models = get_search_models()
+    """
+    TBD
+    """
     instance = kwargs['instance']
+    handler = get_handler()
 
-    # Gathering and handling of dependents is performed first in order to support
-    # indexed models which list non-indexed models as dependency triggers.
-    dependents = merge([instance._search_dependents, get_dependents(instance)])
-    handler = getattr(settings, 'ELASTICSEARCH_DEPENDENCY_HANDLER', None)
+    for model, qs in instance._dependents.items():
+        # Guards indexing by validating the given model has been bound to an
+        # index type and that this type is not currently suspended.
+        if not is_indexed(model, None) or is_suspended(model, None):
+            logger.debug("Skipping dependency indexing for '{}'".format(model))
+            continue
 
-    for model, qs in dependents.items():
         if handler is not None:
-            logger.debug("Using dependency handler '{}' for indexing...".format(handler))
             for record in qs.iterator():
-                (handler_module, handler_name) = handler.rsplit(sep='.', maxsplit=1)
-                module = importlib.import_module(handler_module)
-                func = getattr(module, handler_name)
-                func(None, instance=record)
+                handler(None, instance=record)
         else:
             search_meta = model._search_meta()
             for record in qs.iterator():
-                # !!! TODO !!!
-                # Why aren't we using 'record.index()'?
-                search_meta.index_instance(record)
+                instance.index()
 
     # Guards indexing by validating the given model has been bound to an
     # index type and that this type is not currently suspended.
-    if not isinstance(instance, sender):
-        sender = type(instance)
-    if sender not in search_models or _is_suspended(sender):
-        logger.debug("Skipping indexing for '{}'".format(sender))
+    if not is_indexed(sender, instance) or is_suspended(sender, instance):
+        logger.debug("Skipping indexing for '{}' ({})".format(instance, model))
         return
 
-    logger.debug("Indexing instance '{}'".format(instance))
-    instance.index()
+    if handler is not None:
+        handler(sender, instance=instance)
+    else:
+        instance.index()
 
 
 @receiver(signals.m2m_changed)
 def handle_m2m(sender, **kwargs):
+    """
+    TBD
+    """
     if kwargs['action'].startswith("pre_"):
         collect_dependents(kwargs['model'], **kwargs)
     else:
@@ -107,8 +160,11 @@ def handle_m2m(sender, **kwargs):
 
 
 @contextmanager
-def suspended_updates(models=None, permanent=False):
-    global suspended_models
+def suspended_updates(models=None, permanent=False, slop=timedelta(seconds=10)):
+    """
+    TBD
+    """
+    global SUSPENDED_MODELS
     
     try:
         search_models = get_search_models()
@@ -116,13 +172,13 @@ def suspended_updates(models=None, permanent=False):
             models = search_models
         models = set(models)
 
-        start = now() - SUSPENSION_BUFFER_TIME
-        suspended_models.append(models)
+        start = now() - slop
+        SUSPENDED_MODELS.append(models)
 
         yield
 
     finally:
-        suspended_models.remove(models)
+        SUSPENDED_MODELS.remove(models)
 
         if permanent is True:
             return
