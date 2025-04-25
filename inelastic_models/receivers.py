@@ -108,7 +108,7 @@ def handle_m2m(sender, **kwargs):
     TBD
     """
     if kwargs['action'].startswith("pre_"):
-        model_cls = kwargs.get('model')
+        (model_cls, instance) = (kwargs.get('model'), kwargs.get('instance'))
         instance._inelasticmodels_m2m_dependents = {
             model_cls: model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
         }
