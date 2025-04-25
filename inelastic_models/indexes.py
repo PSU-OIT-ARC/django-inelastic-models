@@ -5,7 +5,7 @@ import gc
 from elasticsearch.helpers import bulk, BulkIndexError
 from elasticsearch import Elasticsearch
 from elasticsearch import exceptions
-import elasticsearch_dsl as dsl
+import elasticsearch.dsl as dsl
 
 from django.conf import settings
 from django.apps import apps

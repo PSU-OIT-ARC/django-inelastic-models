@@ -4,9 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-python-dateutil = ">=2.8.0,<3.0"
-elasticsearch = "~=8.0"
-elasticsearch_dsl = "~=8.0"
+python-dateutil = "~=2.9.0"
+elastic-transport = "~=8.0"
+elasticsearch = "~=8.18.0"
 django = ">=3.2,<5.0"
 
 [dev-packages]
