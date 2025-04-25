@@ -104,6 +104,16 @@ class Search(FieldMappingMixin):
     # BlogPost.objects.filter(author=instance) to be re-indexed.
     dependencies = {}
 
+    # By default, an index update will determine whether or not additional
+    # indexes are related to a given record and will dispatch updates
+    # according to the relationships described in 'get_dependencies()'.
+    #
+    # To disable this behavior, set the following attribute to False.
+    #
+    # To extend or otherwise change this behavior, override the interface
+    # method 'should_dispatch_dependencies'.
+    dispatch_dependencies = True
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -156,6 +166,9 @@ class Search(FieldMappingMixin):
                 return None
 
         return mapping['type']
+
+    def should_dispatch_dependencies(self, instance):
+        return self.dispatch_dependencies
 
     def get_dependencies(self):
         dependencies = self.dependencies.copy()
@@ -290,6 +303,21 @@ class Search(FieldMappingMixin):
             qs = qs.order_by(*self.index_ordering)
 
         return qs
+
+    def get_index_entry(self, instance):
+        """
+        TBD
+        """
+        try:
+            logger.debug("Getting entry for instance '{}'".format(instance))
+            query = self.get_search().query("match", pk=instance.pk)
+            return query.execute().hits
+        except exceptions.ConnectionTimeout as exc:
+            msg = "Index entry request for '{}' timed out."
+            logger.warning(msg.format(instance))
+        except exceptions.ConnectionError as exc:
+            msg = "Index entry request for '{}' encountered a connection error."
+            logger.warning(msg.format(instance))
 
     def index_instance(self, instance):
         if self.get_qs().filter(pk=instance.pk).exists():
