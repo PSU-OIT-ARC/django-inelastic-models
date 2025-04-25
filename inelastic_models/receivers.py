@@ -46,27 +46,6 @@ def get_handler():
     return getattr(module, handler_name)
 
 
-def get_dependents(instance):
-    """
-    TBD
-    """
-    dependents = {}
-
-    for model in get_search_models():
-        search_meta = model._search_meta()
-        dependencies = search_meta.get_dependencies()
-
-        for dep_type in dependencies:
-            if not isinstance(instance, dep_type):
-                continue
-
-            filter_kwargs = {dependencies[dep_type]: instance}
-            qs = search_meta.model.objects.filter(**filter_kwargs)
-            dependents[model] = qs
-
-    return dependents
-
-
 def is_suspended(sender, instance):
     """
     TBD
@@ -88,7 +67,7 @@ def is_indexed(sender, instance):
     """
     search_models = get_search_models()
 
-    if sender is None or not isinstance(instance, sender):
+    if sender is None:
         sender = type(instance)
     if sender not in search_models:
         return False
@@ -96,21 +75,43 @@ def is_indexed(sender, instance):
     return True
 
 
-@receiver(signals.pre_save)
-@receiver(signals.pre_delete)
-def collect_dependents(sender, **kwargs):
+def get_dependents(instance):
     """
     TBD
     """
-    instance = kwargs['instance']
+    dependents = {}
 
-    # Guards indexing by validating the given model has been bound to an
-    # index type and that this type is not currently suspended.
-    if not is_indexed(sender, instance) or is_suspended(sender, instance):
-        logger.debug("Skipping pre-indexing task for '{}'".format(sender))
-        return
+    if type(instance) in get_search_models():
+        search_meta = type(instance)._search_meta()
+        if not search_meta.should_dispatch_dependencies(instance):
+            return dependents
 
-    instance._search_dependents = get_dependents(instance)
+    for model in get_search_models():
+        search_meta = model._search_meta()
+        dependencies = search_meta.get_dependencies()
+
+        for dep_type, select_param in dependencies.items():
+            if not isinstance(instance, dep_type):
+                continue
+
+            filter_kwargs = {select_param: instance}
+            queryset = search_meta.model.objects.filter(**filter_kwargs)
+            if queryset.exists():
+                dependents[model] = queryset
+
+    return dependents
+
+
+@receiver(signals.m2m_changed)
+def handle_m2m(sender, **kwargs):
+    """
+    TBD
+    """
+    if kwargs['action'].startswith("pre_"):
+        model_cls = kwargs.get('model')
+        instance._inelasticmodels_m2m_dependents = {
+            model_cls: model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
+        }
 
 
 @receiver(signals.post_delete)
@@ -122,42 +123,62 @@ def update_search_index(sender, **kwargs):
     instance = kwargs['instance']
     handler = get_handler()
 
-    for model, qs in instance._dependents.items():
-        # Guards indexing by validating the given model has been bound to an
-        # index type and that this type is not currently suspended.
+    # Pass 1: Process one-to-{one,many} index dependencies of `instance`
+    for model, qs in get_dependents(instance).items():
         if not is_indexed(model, None) or is_suspended(model, None):
             logger.debug("Skipping dependency indexing for '{}'".format(model))
             continue
 
+        logger.info(
+            "Indexing {} {} records...".format(
+                qs.count(), str(model._meta.verbose_name)
+            )
+        )
+
         if handler is not None:
             for record in qs.iterator():
+                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
                 handler(None, instance=record)
         else:
             search_meta = model._search_meta()
             for record in qs.iterator():
-                instance.index()
+                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
+                record.index()
 
-    # Guards indexing by validating the given model has been bound to an
-    # index type and that this type is not currently suspended.
+    # Pass 2: Process index for `instance`
     if not is_indexed(sender, instance) or is_suspended(sender, instance):
-        logger.debug("Skipping indexing for '{}' ({})".format(instance, model))
+        logger.debug("Skipping indexing for '{}' ({})".format(instance, sender))
         return
 
     if handler is not None:
+        logger.debug("Indexing '{}' ({})...".format(instance, sender))
         handler(sender, instance=instance)
     else:
+        logger.debug("Indexing '{}' ({})...".format(instance, sender))
         instance.index()
 
+    # Pass 3: Process many-to-many index dependencies of `instance`
+    m2m_dependents = getattr(instance, '_inelasticmodels_m2m_dependents', {})
+    for model, qs in m2m_dependents.items():
+        if not is_indexed(model, None) or is_suspended(model, None):
+            logger.debug("Skipping dependency indexing for '{}'".format(model))
+            continue
 
-@receiver(signals.m2m_changed)
-def handle_m2m(sender, **kwargs):
-    """
-    TBD
-    """
-    if kwargs['action'].startswith("pre_"):
-        collect_dependents(kwargs['model'], **kwargs)
-    else:
-        update_search_index(kwargs['model'], **kwargs)
+        logger.info(
+            "Indexing {} {} records...".format(
+                qs.count(), str(model._meta.verbose_name)
+            )
+        )
+
+        if handler is not None:
+            for record in qs.iterator():
+                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
+                handler(None, instance=record)
+        else:
+            search_meta = model._search_meta()
+            for record in qs.iterator():
+                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
+                record.index()
 
 
 @contextmanager
