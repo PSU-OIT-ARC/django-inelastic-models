@@ -37,10 +37,11 @@ def get_handler():
     """
     handler_path = getattr(settings, 'ELASTICSEARCH_INDEX_HANDLER', None)
     if handler_path is None:
+        logger.warning("handler_path is None:  {}...".format(handler_path))
         return None
 
     logger.debug("Using dependency handler '{}'...".format(handler_path))
-    (handler_module, handler_name) = handler.rsplit(sep='.', maxsplit=1)
+    (handler_module, handler_name) = handler_path.rsplit(sep='.', maxsplit=1)
     module = importlib.import_module(handler_module)
     return getattr(module, handler_name)
 
