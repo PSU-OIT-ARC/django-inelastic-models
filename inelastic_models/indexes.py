@@ -304,11 +304,11 @@ class Search(FieldMappingMixin):
 
         qs = qs.filter(**filters)
 
-        if limit:
-            qs = qs[:limit]
-
         if self.index_ordering is not None:
             qs = qs.order_by(*self.index_ordering)
+
+        if limit:
+            qs = qs[:limit]
 
         return qs
 
