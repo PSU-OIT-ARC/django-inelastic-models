@@ -5,9 +5,13 @@ Changelog
 8.0
 ---
 
-2023-11-22
+2025-04-24
 
-This release adds support for, and requires, the use of ES 8.x.
+This release adds support for, and requires:
+
+* Elasticsearch 8.x.
+* elasticsearch-py >=8.18.0
+* Django 4.2 LTS.
 
 7.1
 ---

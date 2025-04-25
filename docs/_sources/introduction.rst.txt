@@ -34,9 +34,8 @@ The following compatibility matrix summarizes supported versions of the
 .. [#f1] Compatibilty is possible but not officially supported.
 
 Releases prior to 7.0 unofficially supported a variety of Django release
-series and did not explicitly indicate supported combinations.
-
-No official support or guidance is given for these releases.
+series and did not explicitly indicate supported combinations. No official
+support or guidance is given for these releases.
 
 +------+------------+------------+
 |      | Django 3.2 | Django 4.2 |
