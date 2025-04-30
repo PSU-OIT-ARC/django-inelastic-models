@@ -68,14 +68,24 @@ def is_indexed(sender, instance):
     """
     TBD
     """
-    search_models = get_search_models()
-
     if sender is None:
         sender = type(instance)
-    if sender not in search_models:
+    if sender not in get_search_models():
         return False
 
     return True
+
+
+def should_index(sender, instance):
+    """
+    TBD
+    """
+    if sender is None:
+        sender = type(instance)
+    if sender not in get_search_models():
+        return False
+
+    return sender._search_meta().should_index(instance)
 
 
 def get_dependents(instance):
@@ -97,9 +107,8 @@ def get_dependents(instance):
             if not isinstance(instance, dep_type):
                 continue
 
-            filter_kwargs = {select_param: instance}
-            queryset = search_meta.model.objects.filter(**filter_kwargs)
-            if queryset.exists():
+            queryset = search_meta.model.objects.filter(**{select_param: instance})
+            if search_meta.should_index_for_dependency(instance, queryset):
                 dependents[model] = queryset
 
     return dependents
@@ -149,7 +158,11 @@ def update_search_index(sender, **kwargs):
                 record.index()
 
     # Pass 2: Process index for `instance`
-    if not is_indexed(sender, instance) or is_suspended(sender, instance):
+    if (
+            not is_indexed(sender, instance) or
+            is_suspended(sender, instance) or
+            not should_index(sender, instance)
+    ):
         logger.debug("Skipping indexing for '{}' ({})".format(instance, sender))
         return
 

@@ -169,6 +169,9 @@ class Search(FieldMappingMixin):
 
         return mapping['type']
 
+    def should_index(self, instance):
+        return True
+
     def should_dispatch_dependencies(self, instance):
         return self.dispatch_dependencies
 
@@ -189,6 +192,9 @@ class Search(FieldMappingMixin):
                         )
 
         return dependencies
+
+    def should_index_for_dependency(self, instance, queryset):
+        return queryset.exists()
 
     def get_search(self):
         s = dsl.Search(using=self.client)
