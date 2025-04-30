@@ -31,11 +31,14 @@ def get_search_models():
 
 
 @functools.lru_cache()
-def get_handler():
+def get_handler(sender):
     """
     TBD
     """
-    handler_path = getattr(settings, 'ELASTICSEARCH_INDEX_HANDLER', None)
+    if sender not in get_search_models():
+        return None
+
+    handler_path = sender._search_meta().handler
     if handler_path is None:
         logger.warning("handler_path is None:  {}...".format(handler_path))
         return None
@@ -121,7 +124,7 @@ def update_search_index(sender, **kwargs):
     TBD
     """
     instance = kwargs['instance']
-    handler = get_handler()
+    handler = get_handler(sender)
 
     # Pass 1: Process one-to-{one,many} index dependencies of `instance`
     for model, qs in get_dependents(instance).items():

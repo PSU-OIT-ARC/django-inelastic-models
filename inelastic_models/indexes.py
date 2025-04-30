@@ -93,6 +93,8 @@ class TypeAwareSerializableHit(dsl.response.Hit):
 
 class Search(FieldMappingMixin):
     connection = getattr(settings, 'ELASTICSEARCH_DEFAULT_CONNECTION', 'default')
+    handler = getattr(settings, 'ELASTICSEARCH_INDEX_HANDLER', None)
+
     date_field = 'modified_on'
 
     # A dictionary whose keys are other models that this model's index
