@@ -111,8 +111,17 @@ def get_dependents(instance):
                 continue
 
             queryset = search_meta.model.objects.filter(**{select_param: instance})
-            if search_meta.should_index_for_dependency(instance, queryset):
-                dependents[model] = queryset
+            if (
+                    not search_meta.should_index_for_dependency(instance, queryset) or
+                    not any([
+                        search_meta.should_dispatch_dependencies(_instance)
+                        for _instance in queryset.iterator()
+                    ])
+            ):
+                continue
+
+            logger.debug("- Adding '{}' (via {})".format(model, select_param))
+            dependents[model] = queryset
 
     return dependents
 
