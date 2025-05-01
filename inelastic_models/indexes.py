@@ -320,14 +320,18 @@ class Search(FieldMappingMixin):
 
         return qs
 
-    def get_index_entry(self, instance):
+    def get_entry_mapping(self, instance):
         """
-        TBD
+        Fetches mapping which represents this instance in the index.
         """
         try:
-            logger.debug("Getting entry for instance '{}'".format(instance))
+            logger.debug("Getting entry mapping for instance '{}'".format(instance))
             query = self.get_search().query("match", pk=instance.pk)
-            return query.execute().hits
+            hits = query.execute().hits
+            if not len(hits) or len(hits) > 1:
+                logger.warning("Multiple entries found")
+                return None
+            return hits[0].to_dict(recursive=True)
         except exceptions.ConnectionTimeout as exc:
             msg = "Index entry request for '{}' timed out."
             logger.warning(msg.format(instance))

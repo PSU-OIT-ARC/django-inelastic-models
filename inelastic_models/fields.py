@@ -387,8 +387,10 @@ class FieldMappingMixin:
         return {'properties': properties}
 
     def prepare(self, instance):
-        return dict((name, field.get_from_instance(instance))
-                    for name, field in list(self.get_fields().items()))
+        return dict(
+            (name, field.get_from_instance(instance))
+            for name, field in list(self.get_fields().items())
+        )
 
 
 class ObjectFieldMixin(FieldMappingMixin):
