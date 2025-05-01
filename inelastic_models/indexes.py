@@ -210,13 +210,6 @@ class Search(FieldMappingMixin):
                 dependencies.pop(model)
                 dependencies[model_cls] = query
 
-                if hasattr(model_cls, "_search_meta"):
-                    _dependencies = model_cls._search_meta().get_dependencies()
-                    for _model, _query in _dependencies.items():
-                        dependencies[_model] = "{}__{}".format(
-                            query, _query
-                        )
-
         return dependencies
 
     def should_index_for_dependency(self, instance, queryset):

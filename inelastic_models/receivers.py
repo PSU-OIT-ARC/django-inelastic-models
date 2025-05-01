@@ -40,10 +40,9 @@ def get_handler(sender):
 
     handler_path = sender._search_meta().handler
     if handler_path is None:
-        logger.warning("handler_path is None:  {}...".format(handler_path))
         return None
 
-    logger.debug("Using dependency handler '{}'...".format(handler_path))
+    logger.info("Using dependency handler '{}'...".format(handler_path))
     (handler_module, handler_name) = handler_path.rsplit(sep='.', maxsplit=1)
     module = importlib.import_module(handler_module)
     return getattr(module, handler_name)
@@ -99,7 +98,11 @@ def get_dependents(instance):
         if not search_meta.should_dispatch_dependencies(instance):
             return dependents
 
+    logger.debug("Generating dependents for '{}'".format(instance))
     for model in get_search_models():
+        if isinstance(instance, model):
+            continue
+
         search_meta = model._search_meta()
         dependencies = search_meta.get_dependencies()
 
@@ -133,68 +136,50 @@ def update_search_index(sender, **kwargs):
     TBD
     """
     instance = kwargs['instance']
-    handler = get_handler(sender)
+    model_name = str(type(instance)._meta.verbose_name)
 
-    # Pass 1: Process one-to-{one,many} index dependencies of `instance`
-    for model, qs in get_dependents(instance).items():
-        if not is_indexed(model, None) or is_suspended(model, None):
-            logger.debug("Skipping dependency indexing for '{}'".format(model))
-            continue
-
-        logger.info(
-            "Indexing {} {} records...".format(
-                qs.count(), str(model._meta.verbose_name)
-            )
-        )
-
-        if handler is not None:
-            for record in qs.iterator():
-                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
-                handler(None, instance=record)
-        else:
-            search_meta = model._search_meta()
-            for record in qs.iterator():
-                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
-                record.index()
-
-    # Pass 2: Process index for `instance`
+    logger.debug("Dispatching 'update_search_index' on '{}'".format(instance))
     if (
             not is_indexed(sender, instance) or
             is_suspended(sender, instance) or
             not should_index(sender, instance)
     ):
-        logger.debug("Skipping indexing for '{}' ({})".format(instance, sender))
+        logger.debug("Skipping indexing for '{}' ({})".format(instance, model_name))
         return
 
-    if handler is not None:
-        logger.debug("Indexing '{}' ({})...".format(instance, sender))
-        handler(sender, instance=instance)
-    else:
-        logger.debug("Indexing '{}' ({})...".format(instance, sender))
-        instance.index()
+    # Pass 1: Process one-to-{one,many} index dependencies of `instance`
+    for model, qs in get_dependents(instance).items():
+        dep_name = str(model._meta.verbose_name)
 
-    # Pass 3: Process many-to-many index dependencies of `instance`
-    m2m_dependents = getattr(instance, '_inelasticmodels_m2m_dependents', {})
-    for model, qs in m2m_dependents.items():
         if not is_indexed(model, None) or is_suspended(model, None):
-            logger.debug("Skipping dependency indexing for '{}'".format(model))
+            logger.debug("Skipping dependency indexing for '{}'".format(dep_name))
             continue
 
-        logger.info(
-            "Indexing {} {} records...".format(
-                qs.count(), str(model._meta.verbose_name)
-            )
-        )
+        logger.info("Indexing {} {} records...".format(qs.count(), dep_name))
+        for record in qs.iterator():
+            update_search_index(model, instance=record)
 
-        if handler is not None:
-            for record in qs.iterator():
-                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
-                handler(None, instance=record)
-        else:
-            search_meta = model._search_meta()
-            for record in qs.iterator():
-                logger.debug("Indexing '{}' ({})...".format(record, type(record)))
-                record.index()
+    # Pass 2: Process many-to-many index dependencies of `instance`
+    m2m_dependents = getattr(instance, '_inelasticmodels_m2m_dependents', {})
+    for model, qs in m2m_dependents.items():
+        m2m_name = str(model._meta.verbose_name)
+
+        if not is_indexed(model, None) or is_suspended(model, None):
+            logger.debug("Skipping dependency indexing for '{}'".format(m2m_name))
+            continue
+
+        logger.info("Indexing {} {} records...".format(qs.count(), m2m_name))
+        for record in qs.iterator():
+            update_search_index(model, instance=record)
+
+    # Pass 3: Process index for `instance`
+    handler = get_handler(type(instance))
+    if handler is not None:
+        logger.info("Indexing '{}' ({})...".format(instance, model_name))
+        handler(sender, instance=instance)
+    else:
+        logger.info("Indexing '{}' ({})...".format(instance, model_name))
+        instance.index()
 
 
 @contextmanager
