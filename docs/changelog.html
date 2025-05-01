@@ -3,15 +3,15 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en-US" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Changelog &mdash; Django Inelastic Models 8.0.0.dev4 documentation</title>
+  <title>Changelog &mdash; Django Inelastic Models 8.0.0.rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-      <script src="_static/documentation_options.js?v=5592342d"></script>
+      <script src="_static/documentation_options.js?v=1799a698"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
@@ -83,12 +83,24 @@
 <h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading">¶</a></h1>
 <section id="id1">
 <h2>8.0<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
-<p>2025-04-24</p>
+<p>2025-05-??</p>
 <p>This release adds support for, and requires:</p>
 <ul class="simple">
 <li><p>Elasticsearch 8.x.</p></li>
 <li><p>elasticsearch-py &gt;=8.18.0</p></li>
 <li><p>Django 4.2 LTS.</p></li>
+</ul>
+<p>This release significantly refactors indexing operations and code
+paths such that:</p>
+<ul class="simple">
+<li><p>reindexing requests are now validated using a builtin evaluator
+which determines whether or not the index corresponding to a given
+index should be considered dirty.</p></li>
+<li><p>index dependencies are now more rigorously computed as a dependency
+tree and updates are now properly dispatched to dependent indices.</p></li>
+<li><p>additional interfaces have been added to the ‘Search’ object in
+order to allow implementations to provide custom logic when
+considering index updates and dependency dispatching.</p></li>
 </ul>
 </section>
 <section id="id2">
