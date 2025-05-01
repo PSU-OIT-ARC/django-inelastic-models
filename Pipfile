@@ -10,6 +10,7 @@ elasticsearch = "~=8.18.0"
 django = ">=3.2,<5.0"
 
 [dev-packages]
+pip-audit = "*"
 textile = "~=4.0.0"
 Sphinx = "~=8.2.0"
 sphinx_rtd_theme = "~=3.0.0"

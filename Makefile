@@ -33,7 +33,7 @@ view-docs: documentation  ## Launches a Python HTTP server to view docs
 update_pip_requirements:  ## Updates python dependencies
 	@echo "Updating Python release requirements..."; echo ""
 	@pipenv --venv || pipenv --python $(pipenv_python)
-	@pipenv run pip-audit --disable-pip -r <(pipenv reqirements --hash)
+	@pipenv run pip-audit --disable-pip -r <(pipenv requirements --hash)
 	@pipenv update --dev
 	@pipenv verify || (echo "Verification failed!" && exit 1)
 	@pipenv clean
