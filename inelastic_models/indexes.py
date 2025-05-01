@@ -169,11 +169,37 @@ class Search(FieldMappingMixin):
 
         return mapping['type']
 
+    def has_index_changed(self, instance):
+        """
+        Evaluates whether any indexed fields have changed on instance.
+        """
+        entry = self.get_entry_mapping(instance)
+        if entry is None:
+            return False
+
+        for name, field in self.get_fields().items():
+            index_value = entry.get(name)
+            instance_value = field.get_from_instance(instance)
+
+            if isinstance(index_value, type(instance_value)):
+                if isinstance(index_value, dict):
+                    for key, val in index_value.items():
+                        if val != instance_value.get(key):
+                            return True
+                elif index_value != instance_value:
+                    return True
+
+        logger.debug("Index entry '{}' has not changed".format(instance))
+        return False
+
     def should_index(self, instance):
-        return True
+        return self.has_index_changed(instance)
 
     def should_dispatch_dependencies(self, instance):
-        return self.dispatch_dependencies
+        if not self.dispatch_dependencies:
+            return False
+
+        return self.has_index_changed(instance)
 
     def get_dependencies(self):
         dependencies = self.dependencies.copy()
