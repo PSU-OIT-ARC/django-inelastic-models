@@ -244,13 +244,25 @@ class Search(FieldMappingMixin):
         return False
 
     def should_index(self, instance):
-        return self.has_index_changed(instance)
+        try:
+            return self.has_index_changed(instance)
+        except Exception as exc:
+            import traceback; traceback.print_exc()
+            logger.error(
+                "Exception during 'should_index': {}".format(str(exc))
+            )
 
     def should_dispatch_dependencies(self, instance):
         if not self.dispatch_dependencies:
             return False
 
-        return self.has_index_changed(instance)
+        try:
+            return self.has_index_changed(instance)
+        except Exception as exc:
+            import traceback; traceback.print_exc()
+            logger.error(
+                "Exception during 'should_dispatch_dependencies': {}".format(str(exc))
+            )
 
     def get_dependencies(self):
         dependencies = self.dependencies.copy()
