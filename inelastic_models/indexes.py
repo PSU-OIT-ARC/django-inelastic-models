@@ -1,5 +1,6 @@
 import threading
 import logging
+import pprint
 import gc
 
 from elasticsearch.helpers import bulk, BulkIndexError
@@ -182,27 +183,64 @@ class Search(FieldMappingMixin):
 
         return mapping['type']
 
-    def has_index_changed(self, instance):
+    def has_index_changed(self, instance, fields=None):
         """
         Evaluates whether any indexed fields have changed on instance.
         """
-        entry = self.get_entry_mapping(instance)
-        if entry is None:
-            return False
+        index_entry = self.get_entry_mapping(instance)
+        if index_entry is None:
+            logger.debug(
+                "No matching index entry for '{}' in {} (fields={}) found".format(
+                    instance, self.get_doc_type(), fields
+                )
+            )
+            return True
 
         for name, field in self.get_fields().items():
-            index_value = entry.get(name)
+            if fields is not None and name not in fields:
+                logger.debug("Skipping field '{}'...".format(name))
+                continue
+
+            index_value = index_entry.get(name)
             instance_value = field.get_from_instance(instance)
 
-            if isinstance(index_value, type(instance_value)):
-                if isinstance(index_value, dict):
-                    for key, val in index_value.items():
-                        if val != instance_value.get(key):
+            if not isinstance(index_value, type(instance_value)):
+                logger.debug(
+                    "Ignoring non-matching types {}, {}".format(
+                        type(index_value), type(instance_value)
+                    )
+                )
+            elif hasattr(field, "model") and hasattr(field.model, "_search_meta"):
+                if isinstance(instance_value, dict):
+                    _instance = field.model.objects.get(pk=instance_value.get("pk"))
+                    if field.model._search_meta().has_index_changed(
+                            _instance, fields=field.get_fields().keys()
+                    ):
+                        return True
+                elif isinstance(instance_value, list):
+                    for _el in instance_value:
+                        _instance = field.model.objects.get(pk=_el.get("pk"))
+                        if field.model._search_meta().has_index_changed(
+                                _instance, fields=field.get_fields().keys()
+                        ):
                             return True
-                elif index_value != instance_value:
-                    return True
+            elif index_value != instance_value:
+                sep_length = min(80, 2 + len(str(index_value)))
+                logger.debug(
+                    "Found mismatched index element '{}':\n {}\n {}\n {}".format(
+                        name,
+                        pprint.pformat(index_value),
+                        "".join(["^" for i in range(sep_length)]),
+                        pprint.pformat(instance_value)
+                    )
+                )
+                return True
 
-        logger.debug("Index entry '{}' has not changed".format(instance))
+        logger.debug(
+            "Index entry for '{}' in {} (fields={}) has not changed".format(
+                instance, self.get_doc_type(), fields
+            )
+        )
         return False
 
     def should_index(self, instance):
