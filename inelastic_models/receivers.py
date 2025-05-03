@@ -146,18 +146,33 @@ def update_search_index(sender, **kwargs):
     """
     instance = kwargs['instance']
     model_name = str(type(instance)._meta.verbose_name)
+    dependents = get_dependents(instance)
 
-    logger.debug("Dispatching 'update_search_index' on '{}'".format(instance))
     if (
             not is_indexed(sender, instance) or
             is_suspended(sender, instance) or
             not should_index(sender, instance)
     ):
-        logger.debug("Skipping indexing for '{}' ({})".format(instance, model_name))
+        if not dependents:
+            return
+
+        for model, qs in dependents.items():
+            dep_name = str(model._meta.verbose_name)
+
+            if not is_indexed(model, None) or is_suspended(model, None):
+                logger.debug("Skipping dependency indexing for '{}'".format(dep_name))
+                continue
+
+            logger.info("Indexing {} {} records...".format(qs.count(), dep_name))
+            for record in qs.iterator():
+                update_search_index(model, instance=record)
+
         return
 
+    logger.debug("Dispatching 'update_search_index' on '{}'".format(instance))
+
     # Pass 1: Process one-to-{one,many} index dependencies of `instance`
-    for model, qs in get_dependents(instance).items():
+    for model, qs in dependents.items():
         dep_name = str(model._meta.verbose_name)
 
         if not is_indexed(model, None) or is_suspended(model, None):
