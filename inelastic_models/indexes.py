@@ -126,17 +126,30 @@ class Search(FieldMappingMixin):
         setattr(model, 'Search', cls)
 
     @classmethod
-    def as_field(cls, attr, model, field_type):
+    def as_field(cls, attr, model, field_type, source_fields=None, use_all_field=None):
         class _inner(field_type):
             mapping_type = 'object'
+
+        def _filter_fields(fields):
+            if source_fields is None:
+                return fields
+            if isinstance(fields, list):
+                return [f for f in fields if f in source_fields]
+            if isinstance(fields, dict):
+                return dict([
+                    (k, v) for k,v in fields.items() if k in source_fields
+                ])
+
         field = _inner(
             attr,
             model=model,
-            attribute_fields=cls.attribute_fields,
-            template_fields=cls.template_fields,
-            other_fields=cls.other_fields
+            attribute_fields=_filter_fields(cls.attribute_fields),
+            template_fields=_filter_fields(cls.template_fields),
+            other_fields=_filter_fields(cls.other_fields)
         )
-        field.use_all_field = cls.use_all_field
+        field.use_all_field = (
+            cls.use_all_field if use_all_field is None else use_all_field
+        )
         return field
 
     def get_settings(self):
