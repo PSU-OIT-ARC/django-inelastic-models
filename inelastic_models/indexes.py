@@ -344,6 +344,12 @@ class Search(FieldMappingMixin):
             return False
 
         def validate_properties(lhs, rhs):
+            if len(lhs) != len(rhs):
+                logger.warning(
+                    "Size of properties differs: {}, {}".format(len(lhs), len(rhs))
+                )
+                return False
+
             for name, info in lhs.items():
                 if name not in rhs:
                     return False
@@ -353,16 +359,19 @@ class Search(FieldMappingMixin):
                 if info.get('type', 'object') != rhs[name].get('type', 'object'):
                     return False
                 if 'properties' in info:
-                    validate_properties(
+                    if not validate_properties(
                         info['properties'],
                         rhs[name]['properties']
-                    )
+                    ):
+                        return False
+
             return True
 
         active_mapping = self.client.indices.get_mapping(index=index)
         document = active_mapping.get(index).get('mappings')
-        return validate_properties(mapping.get('properties'),
-                                   document.get('properties'))
+        return validate_properties(
+            mapping.get('properties'), document.get('properties')
+        )
 
     def put_mapping(self):
         """
