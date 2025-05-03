@@ -419,8 +419,11 @@ class Search(FieldMappingMixin):
             logger.debug("Getting entry mapping for instance '{}'".format(instance))
             query = self.get_search().query("match", pk=instance.pk)
             hits = query.execute().hits
-            if not len(hits) or len(hits) > 1:
-                logger.warning("Multiple entries found")
+            if not len(hits):
+                logger.debug("No entries found.".format(instance))
+                return None
+            if len(hits) > 1:
+                logger.debug("Multiple entries found: {}".format(hits))
                 return None
             return hits[0].to_dict(recursive=True)
         except exceptions.ConnectionTimeout as exc:
