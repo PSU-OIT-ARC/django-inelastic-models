@@ -135,7 +135,7 @@ class AttributeField(SearchField):
                 instance = getattr(instance, attr)
             except AttributeError as exc:
                 msg = "'{0}' not defined on {1}: {2!s}"
-                logger.warning(msg.format(self.path, instance, exc))
+                logger.warning(msg.format(attr, instance, exc))
                 return None
             except ObjectDoesNotExist as exc:
                 msg = "Reference '{}' on '{}' does not exist."
@@ -280,8 +280,8 @@ class RenderedAttributeField(AttributeField):
 
 
 class FieldMappingMixin:
-    attribute_fields = ()
-    template_fields = ()
+    attribute_fields = []
+    template_fields = []
     other_fields = {}
 
     use_all_field = getattr(settings, 'ELASTICSEARCH_USE_ALL_FIELD', False)
@@ -352,7 +352,9 @@ class FieldMappingMixin:
         for name in self.template_fields:
             fields[name] = TemplateField(
                 template_name = "search/indexes/%s/%s_%s.html" % (
-                    self.model._meta.app_label, self.model._meta.model_name, name))
+                    self.model._meta.app_label, self.model._meta.model_name, name
+                )
+            )
 
         fields.update(self.other_fields)
 
