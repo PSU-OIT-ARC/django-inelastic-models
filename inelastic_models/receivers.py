@@ -131,11 +131,60 @@ def handle_m2m(sender, **kwargs):
     """
     TBD
     """
-    if kwargs['action'].startswith("pre_"):
-        (model_cls, instance) = (kwargs.get('model'), kwargs.get('instance'))
+    (model_cls, instance, reverse) = (
+        kwargs.get('model'), kwargs.get('instance'), kwargs.get('reverse')
+    )
+
+    if kwargs['action'] == "pre_clear":
+        field = None
+        for _field in sender._meta.get_fields():
+            if _field.related_model is None:
+                continue
+            if issubclass(type(instance), _field.related_model):
+                field = _field
+
+        objs = []
+        if field is not None:
+            objs = model_cls.objects.filter(**{field.name: instance.pk})
+        if getattr(instance, "_inelasticmodels_m2m_dependents", None) is None:
+            instance._inelasticmodels_m2m_dependents = {}
+
+        pk_set = set(objs.values_list('pk', flat=True))
+        if instance._inelasticmodels_m2m_dependents.get(model_cls):
+            current = instance._inelasticmodels_m2m_dependents[model_cls]
+            pk_set = current | pk_set
+
+        instance._inelasticmodels_m2m_dependents = {model_cls: pk_set}
+
+    elif kwargs['action'] == "post_clear":
+        logger.debug("M2M dependents of 'clear' on {}".format(instance))
+        logger.debug("- {}".format(instance._inelasticmodels_m2m_dependents))
+
+        if reverse:
+            dependents = instance._inelasticmodels_m2m_dependents.pop(model_cls)
+            for pk in dependents:
+                dependent = model_cls.objects.get(pk=pk)
+                update_search_index(sender, instance=dependent)
+        else:
+            update_search_index(sender, instance=instance)
+
+    elif kwargs['action'].startswith("pre_"):
+        queryset = model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
         instance._inelasticmodels_m2m_dependents = {
-            model_cls: model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
+            model_cls: set(queryset.values_list('pk', flat=True))
         }
+
+    elif kwargs['action'].startswith("post_"):
+        logger.debug("M2M dependents of 'add/remove' on {}".format(instance))
+        logger.debug("- {}".format(instance._inelasticmodels_m2m_dependents))
+
+        if reverse:
+            dependents = instance._inelasticmodels_m2m_dependents.pop(model_cls)
+            for pk in dependents:
+                dependent = model_cls.objects.get(pk=pk)
+                update_search_index(sender, instance=dependent)
+        else:
+            update_search_index(sender, instance=instance)
 
 
 @receiver(signals.post_delete)
