@@ -103,7 +103,7 @@ classifiers = [  # Optional
 dependencies = [ # Optional
   'python-dateutil >= 2.8.0, <3.0',
   'elasticsearch ~= 8.18.0',
-  'django >= 3.2, <5.0'
+  'django >= 4.2, <5.0'
 ]
 
 # List additional groups of dependencies here (e.g. development
@@ -117,11 +117,12 @@ dependencies = [ # Optional
 [project.optional-dependencies] # Optional
 dev = [
   'textile ~= 4.0.0',
-  'Sphinx ~= 7.2.0',
-  'sphinx_rtd_theme ~= 1.3.0',
-  'tblib ~= 3.0.0',
-  'coverage ~= 7.3.0',
-  'django-dynamic-fixture ~= 4.0.0'
+  'Sphinx ~= 8.2.0',
+  'sphinx_rtd_theme ~= 3.0.0',
+  'tblib ~= 3.1.0',
+  'coverage ~= 7.8.0',
+  'django-dynamic-fixture ~= 4.0.0',
+  'black ~= 25.1.0'
 ]
 
 # List URLs that are relevant to your project
