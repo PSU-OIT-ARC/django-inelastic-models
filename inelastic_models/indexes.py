@@ -212,14 +212,16 @@ class Search(FieldMappingMixin):
                 )
             elif hasattr(field, "model") and hasattr(field.model, "_search_meta"):
                 if isinstance(instance_value, dict):
-                    _instance = field.model.objects.get(pk=instance_value.get("pk"))
+                    _queryset = field.model._search_meta().get_base_qs()
+                    _instance = _queryset.get(pk=instance_value.get("pk"))
                     if field.model._search_meta().has_index_changed(
                             _instance, fields=field.get_fields().keys()
                     ):
                         return True
                 elif isinstance(instance_value, list):
                     for _el in instance_value:
-                        _instance = field.model.objects.get(pk=_el.get("pk"))
+                        queryset = field.model._search_meta().get_base_qs()
+                        _instance = _queryset.get(pk=_el.get("pk"))
                         if field.model._search_meta().has_index_changed(
                                 _instance, fields=field.get_fields().keys()
                         ):
