@@ -131,11 +131,14 @@ def handle_m2m(sender, **kwargs):
     """
     TBD
     """
-    (model_cls, instance, reverse) = (
-        kwargs.get('model'), kwargs.get('instance'), kwargs.get('reverse')
+    (model_cls, instance, m2m_action, reverse) = (
+        kwargs.get('model'),
+        kwargs.get('instance'),
+        kwargs.get('action'),
+        kwargs.get('reverse')
     )
 
-    if kwargs['action'] == "pre_clear":
+    if m2m_action == "pre_clear":
         field = None
         for _field in sender._meta.get_fields():
             if _field.related_model is None:
@@ -156,8 +159,8 @@ def handle_m2m(sender, **kwargs):
 
         instance._inelasticmodels_m2m_dependents = {model_cls: pk_set}
 
-    elif kwargs['action'] == "post_clear":
-        logger.debug("M2M dependents of 'clear' on {}".format(instance))
+    elif m2m_action == "post_clear":
+        logger.debug("M2M dependents of '{}' on {}".format(m2m_action, instance))
         logger.debug("- {}".format(instance._inelasticmodels_m2m_dependents))
 
         if reverse:
@@ -168,14 +171,14 @@ def handle_m2m(sender, **kwargs):
         else:
             update_search_index(sender, instance=instance)
 
-    elif kwargs['action'].startswith("pre_"):
+    elif m2m_action.startswith("pre_"):
         queryset = model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
         instance._inelasticmodels_m2m_dependents = {
             model_cls: set(queryset.values_list('pk', flat=True))
         }
 
-    elif kwargs['action'].startswith("post_"):
-        logger.debug("M2M dependents of 'add/remove' on {}".format(instance))
+    elif m2m_action.startswith("post_"):
+        logger.debug("M2M dependents of '{}' on {}".format(m2m_action, instance))
         logger.debug("- {}".format(instance._inelasticmodels_m2m_dependents))
 
         if reverse:
