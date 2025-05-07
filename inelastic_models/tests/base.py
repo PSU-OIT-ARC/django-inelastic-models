@@ -12,8 +12,9 @@ class SearchTestRunner(DiscoverRunner):
     def setup_test_environment(self, **kwargs):
         super().setup_test_environment(**kwargs)
 
-        for model in get_search_models():
-            model._search_meta().put_mapping()
+        if not self.keepdb:
+            for model in get_search_models():
+                model._search_meta().put_mapping()
 
 
 class SearchBaseTestCase(object):
