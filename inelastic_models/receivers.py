@@ -75,7 +75,7 @@ def is_indexed(sender, instance):
     return True
 
 
-def should_index(sender, instance):
+def should_index(sender, instance, signal=None):
     """
     TBD
     """
@@ -83,6 +83,12 @@ def should_index(sender, instance):
         sender = type(instance)
     if sender not in get_search_models():
         return False
+
+    if signal is not None and signal == signals.post_delete:
+        logger.debug(
+            "Marking captured deletion of '{}' as should_index.".format(instance)
+        )
+        return True
 
     return sender._search_meta().should_index(instance)
 
@@ -203,7 +209,7 @@ def update_search_index(sender, **kwargs):
     if (
             not is_indexed(sender, instance) or
             is_suspended(sender, instance) or
-            not should_index(sender, instance)
+            not should_index(sender, instance, signal=kwargs.get('signal'))
     ):
         if not dependents:
             return
