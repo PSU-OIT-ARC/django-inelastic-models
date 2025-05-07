@@ -1,4 +1,4 @@
-version: '3'
+
 
 secrets:
   ESPassword:
@@ -10,19 +10,19 @@ networks:
 
 services:
   elasticsearch:
-    image: elasticsearch:8.10.2
+    image: elasticsearch:8.18.0
     networks:
       - default
     ports:
-      - "9200:9200"
+      - "9201:9200"
     environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - cluster.name=inelastic_models
-      - bootstrap.memory_lock=true
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - node.name=elasticsearch
       - ELASTIC_PASSWORD_FILE=/run/secrets/ESPassword
       - ELASTIC_CLIENT_APIVERSIONING=1
-    mem_limit: 512M
     mem_swappiness: 1
     ulimits:
       nofile:
