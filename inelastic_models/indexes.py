@@ -211,19 +211,27 @@ class Search(FieldMappingMixin):
                     )
                 )
             elif hasattr(field, "model") and hasattr(field.model, "_search_meta"):
-                if isinstance(instance_value, dict):
+                if isinstance(instance_value, dict) and instance_value:
                     _queryset = field.model._search_meta().get_base_qs()
-                    _instance = _queryset.get(pk=instance_value.get("pk"))
-                    if field.model._search_meta().has_index_changed(
-                            _instance, fields=field.get_fields().keys()
+                    _maybe_instance = _queryset.filter(pk=instance_value.get("pk"))
+                    if (
+                            _maybe_instance.exists() and
+                            field.model._search_meta().has_index_changed(
+                                _maybe_instance.get(),
+                                fields=field.get_fields().keys()
+                            )
                     ):
                         return True
-                elif isinstance(instance_value, list):
+                elif isinstance(instance_value, list) and instance_value:
                     for _el in instance_value:
-                        queryset = field.model._search_meta().get_base_qs()
-                        _instance = _queryset.get(pk=_el.get("pk"))
-                        if field.model._search_meta().has_index_changed(
-                                _instance, fields=field.get_fields().keys()
+                        _queryset = field.model._search_meta().get_base_qs()
+                        _maybe_instance = _queryset.filter(pk=_el.get("pk"))
+                        if (
+                                _maybe_instance.exists() and
+                                field.model._search_meta().has_index_changed(
+                                    _maybe_instance.get(),
+                                    fields=field.get_fields().keys()
+                                )
                         ):
                             return True
             elif index_value != instance_value:
@@ -405,6 +413,7 @@ class Search(FieldMappingMixin):
 
         qs = qs.filter(**filters)
 
+        # TODO: is this change acceptable?
         if self.index_ordering is not None:
             qs = qs.order_by(*self.index_ordering)
 
