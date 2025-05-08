@@ -84,9 +84,9 @@ def should_index(sender, instance, signal=None):
     if sender not in get_search_models():
         return False
 
-    if signal is not None and signal == signals.post_delete:
+    if signal is not None and signal in [signals.m2m_changed, signals.post_delete]:
         logger.debug(
-            "Marking captured deletion of '{}' as should_index.".format(instance)
+            "Marking captured m2m/deletion of '{}' as should_index.".format(instance)
         )
         return True
 
@@ -173,9 +173,11 @@ def handle_m2m(sender, **kwargs):
             dependents = instance._inelasticmodels_m2m_dependents.pop(model_cls)
             for pk in dependents:
                 dependent = model_cls.objects.get(pk=pk)
-                update_search_index(sender, instance=dependent)
+                update_search_index(
+                    model_cls, instance=dependent, signal=kwargs['signal']
+                )
         else:
-            update_search_index(sender, instance=instance)
+            update_search_index(model_cls, instance=instance, signal=kwargs['signal'])
 
     elif m2m_action.startswith("pre_"):
         queryset = model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
@@ -191,9 +193,11 @@ def handle_m2m(sender, **kwargs):
             dependents = instance._inelasticmodels_m2m_dependents.pop(model_cls)
             for pk in dependents:
                 dependent = model_cls.objects.get(pk=pk)
-                update_search_index(sender, instance=dependent)
+                update_search_index(
+                    model_cls, instance=dependent, signal=kwargs['signal']
+                )
         else:
-            update_search_index(sender, instance=instance)
+            update_search_index(model_cls, instance=instance, signal=kwargs['signal'])
 
 
 @receiver(signals.post_delete)
