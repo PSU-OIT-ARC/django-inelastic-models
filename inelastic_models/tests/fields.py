@@ -19,19 +19,13 @@ class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):
                                   email="test1@example.com",
                                   date=datetime.date(2015, 1, 1))
 
-        tm.save()
         tm2 = self.create_instance(name='Test2 four five six',
                                    email="test2@example.com",
                                    date=None)
-        tm.save()
 
         tsfm = G(SearchFieldModel, related=tm)
-        tsfm.save()
-
         tsfm.models.add(tm)
-        tsfm.model_set.add(tm)
-        tsfm.model_set.add(tm2)
-        tsfm.save()
+        tsfm.model_set.add(tm, tm2)
 
     def test_attribute_field(self):
         self.assertEqual(Model.search.count(), 2)

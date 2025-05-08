@@ -77,4 +77,10 @@ class SearchFieldModelSearch(Search):
         ),
     }
 
+    dependencies = {
+        'inelastic_models.Model': 'related',
+        'inelastic_models.Model': 'models'
+    }
+
+
 SearchFieldModelSearch.bind_to_model(SearchFieldModel)
