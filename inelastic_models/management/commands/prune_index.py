@@ -9,7 +9,8 @@ class Command(IndexCommand):
     """
     TBD
     """
-    help = 'Prunes the search index to synchronize it with the corresponding data model store.'
+
+    help = "Prunes the search index to synchronize it with the corresponding data model store."
 
     def handle_operation(self, search, queryset):
         logger.info("Pruning {} objects".format(search.model.__name__))

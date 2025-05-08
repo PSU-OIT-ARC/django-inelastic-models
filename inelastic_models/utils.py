@@ -18,7 +18,9 @@ def merge(items, overwrite=True):
     if all(isinstance(i, dict) for i in items):
         # Merge dictionaries by recursively merging each key.
         keys = set(chain.from_iterable(i.keys() for i in items))
-        return dict((k, merge([i[k] for i in items if k in i], overwrite)) for k in keys)
+        return dict(
+            (k, merge([i[k] for i in items if k in i], overwrite)) for k in keys
+        )
     elif all(isinstance(i, list) for i in items):
         # Merge lists by chaining them together.
         return list(set(chain.from_iterable(items)))

@@ -30,6 +30,16 @@ view-docs: port=8000
 view-docs: documentation  ## Launches a Python HTTP server to view docs
 	@$(pipenv_bin)/python -m http.server --bind 0.0.0.0 --dir docs $(port)
 
+check_formatting: target_path="inelastic_models"
+check_formatting:  ## Examines source code given by path. Params 'target_path'
+	@echo "Formatting source tree at '$(target_path)'..."
+	@pipenv run black --check $(target_path)
+
+update_formatting: target_path="inelastic_models"
+update_formatting:  ## Reformats source code given by path. Params 'target_path'
+	@echo "Formatting source tree at '$(target_path)'..."
+	@pipenv run black $(target_path)
+
 update_pip_requirements:  ## Updates python dependencies
 	@echo "Updating Python release requirements..."; echo ""
 	@pipenv --venv || pipenv --python $(pipenv_python)

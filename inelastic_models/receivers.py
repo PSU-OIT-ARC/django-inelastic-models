@@ -24,10 +24,7 @@ def get_search_models():
     """
     TBD
     """
-    return [
-        m for m in apps.get_models()
-        if issubclass(m, SearchMixin)
-    ]
+    return [m for m in apps.get_models() if issubclass(m, SearchMixin)]
 
 
 @functools.lru_cache()
@@ -43,7 +40,7 @@ def get_handler(sender):
         return None
 
     logger.info("Using dependency handler '{}'...".format(handler_path))
-    (handler_module, handler_name) = handler_path.rsplit(sep='.', maxsplit=1)
+    (handler_module, handler_name) = handler_path.rsplit(sep=".", maxsplit=1)
     module = importlib.import_module(handler_module)
     return getattr(module, handler_name)
 
@@ -117,17 +114,18 @@ def get_dependents(instance):
                 continue
 
             queryset = search_meta.get_base_qs().filter(**{select_param: instance})
-            if (
-                    not search_meta.should_index_for_dependency(instance, queryset) or
-                    not any([
-                        search_meta.should_dispatch_dependencies(_instance)
-                        for _instance in queryset.iterator()
-                    ])
+            if not search_meta.should_index_for_dependency(
+                instance, queryset
+            ) or not any(
+                [
+                    search_meta.should_dispatch_dependencies(_instance)
+                    for _instance in queryset.iterator()
+                ]
             ):
                 continue
 
             logger.debug("- Adding '{}' (via {})".format(model, select_param))
-            dependents[model] = set(queryset.values_list('pk', flat=True))
+            dependents[model] = set(queryset.values_list("pk", flat=True))
 
     return dependents
 
@@ -138,10 +136,10 @@ def handle_m2m(sender, **kwargs):
     TBD
     """
     (model_cls, instance, m2m_action, reverse) = (
-        kwargs.get('model'),
-        kwargs.get('instance'),
-        kwargs.get('action'),
-        kwargs.get('reverse')
+        kwargs.get("model"),
+        kwargs.get("instance"),
+        kwargs.get("action"),
+        kwargs.get("reverse"),
     )
 
     if m2m_action == "pre_clear":
@@ -158,7 +156,7 @@ def handle_m2m(sender, **kwargs):
         if getattr(instance, "_inelasticmodels_m2m_dependents", None) is None:
             instance._inelasticmodels_m2m_dependents = {}
 
-        pk_set = set(objs.values_list('pk', flat=True))
+        pk_set = set(objs.values_list("pk", flat=True))
         if instance._inelasticmodels_m2m_dependents.get(model_cls):
             current = instance._inelasticmodels_m2m_dependents[model_cls]
             pk_set = current | pk_set
@@ -174,15 +172,15 @@ def handle_m2m(sender, **kwargs):
             for pk in dependents:
                 dependent = model_cls.objects.get(pk=pk)
                 update_search_index(
-                    model_cls, instance=dependent, signal=kwargs['signal']
+                    model_cls, instance=dependent, signal=kwargs["signal"]
                 )
         else:
-            update_search_index(model_cls, instance=instance, signal=kwargs['signal'])
+            update_search_index(model_cls, instance=instance, signal=kwargs["signal"])
 
     elif m2m_action.startswith("pre_"):
         queryset = model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
         instance._inelasticmodels_m2m_dependents = {
-            model_cls: set(queryset.values_list('pk', flat=True))
+            model_cls: set(queryset.values_list("pk", flat=True))
         }
 
     elif m2m_action.startswith("post_"):
@@ -194,10 +192,10 @@ def handle_m2m(sender, **kwargs):
             for pk in dependents:
                 dependent = model_cls.objects.get(pk=pk)
                 update_search_index(
-                    model_cls, instance=dependent, signal=kwargs['signal']
+                    model_cls, instance=dependent, signal=kwargs["signal"]
                 )
         else:
-            update_search_index(model_cls, instance=instance, signal=kwargs['signal'])
+            update_search_index(model_cls, instance=instance, signal=kwargs["signal"])
 
 
 @receiver(signals.post_delete)
@@ -206,15 +204,16 @@ def update_search_index(sender, **kwargs):
     """
     TBD
     """
-    instance = kwargs['instance']
+    instance = kwargs["instance"]
     model_name = str(type(instance)._meta.verbose_name)
     dependents = get_dependents(instance)
 
     if (
-            not is_indexed(sender, instance) or
-            is_suspended(sender, instance) or
-            not should_index(sender, instance, signal=kwargs.get('signal'))
+        not is_indexed(sender, instance)
+        or is_suspended(sender, instance)
+        or not should_index(sender, instance, signal=kwargs.get("signal"))
     ):
+
         if not dependents:
             return
 
@@ -226,9 +225,7 @@ def update_search_index(sender, **kwargs):
                 continue
 
             logger.debug(
-                "Dispatching update of {} {} records...".format(
-                    len(pk_set), dep_name
-                )
+                "Dispatching update of {} {} records...".format(len(pk_set), dep_name)
             )
             queryset = model._search_meta().get_base_qs()
             for record in queryset.filter(pk__in=pk_set).iterator():
@@ -254,7 +251,7 @@ def update_search_index(sender, **kwargs):
             update_search_index(model, instance=record)
 
     # Pass 2: Process many-to-many index dependencies of `instance`
-    m2m_dependents = getattr(instance, '_inelasticmodels_m2m_dependents', {})
+    m2m_dependents = getattr(instance, "_inelasticmodels_m2m_dependents", {})
     for model, pk_set in m2m_dependents.items():
         m2m_name = str(model._meta.verbose_name)
 
@@ -285,7 +282,7 @@ def suspended_updates(models=None, permanent=False, slop=timedelta(seconds=10)):
     TBD
     """
     global SUSPENDED_MODELS
-    
+
     try:
         search_models = get_search_models()
         if models is None:
@@ -302,7 +299,7 @@ def suspended_updates(models=None, permanent=False, slop=timedelta(seconds=10)):
 
         if permanent is True:
             return
-        
+
         search_models = get_search_models()
         for model in search_models:
             search_meta = model._search_meta()

@@ -17,18 +17,19 @@ class CommandTestCaseMixin(SearchBaseTestCase):
     """
     TBD
     """
+
     command_name = None
 
     def get_command_args(self):
         raise NotImplementedError
 
     def check_command_response(self, response, **kwargs):
-        if kwargs.get('error', None) is not None:
-            print("\nCommand errors detected.\n%s" % (kwargs.pop('error')))
+        if kwargs.get("error", None) is not None:
+            print("\nCommand errors detected.\n%s" % (kwargs.pop("error")))
             self.fail("Command generated errors.")
 
     def test_command(self):
-        if hasattr(self, 'prepare_command'):
+        if hasattr(self, "prepare_command"):
             self.prepare_command()
 
         (args, kwargs) = self.get_command_args()
@@ -37,10 +38,11 @@ class CommandTestCaseMixin(SearchBaseTestCase):
         error = None
 
         try:
-            kwargs.update({'stdout': response_buffer})
+            kwargs.update({"stdout": response_buffer})
             call_command(self.command_name, *args, **kwargs)
         except Exception as e:
             import traceback
+
             traceback.print_exc()
             error = e
 
@@ -55,22 +57,24 @@ class SearchCommandTestCase(CommandTestCaseMixin):
         super().setUp()
 
         with suspended_updates(models=[Model], permanent=True):
-            self.instance = G(Model, name='Test1')
+            self.instance = G(Model, name="Test1")
 
         self.assertEqual(Model.search.count(), 0)
 
     def get_command_args(self):
-        (args, kwargs) = (('inelastic_models.model',), {})
+        (args, kwargs) = (("inelastic_models.model",), {})
 
-        kwargs['since'] = datetime.date.today().strftime('%Y-%m-%d')
-        kwargs['until'] = (datetime.date.today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
-        kwargs['limit'] = self.update_limit
+        kwargs["since"] = datetime.date.today().strftime("%Y-%m-%d")
+        kwargs["until"] = (datetime.date.today() + datetime.timedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        )
+        kwargs["limit"] = self.update_limit
 
         return (args, kwargs)
 
 
 class CreateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
-    command_name = 'create_index'
+    command_name = "create_index"
 
     def check_command_response(self, response, **kwargs):
         super().check_command_response(response, **kwargs)
@@ -79,13 +83,13 @@ class CreateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
 
 
 class UpdateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
-    command_name = 'update_index'
+    command_name = "update_index"
 
     def setUp(self):
         super().setUp()
 
         with suspended_updates(models=[Model], permanent=True):
-            G(Model, name='Test2')
+            G(Model, name="Test2")
 
     def check_command_response(self, response, **kwargs):
         super().check_command_response(response, **kwargs)
@@ -95,23 +99,25 @@ class UpdateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
 
 # TODO
 class PruneIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
-    command_name = 'prune_index'
+    command_name = "prune_index"
 
     def check_command_response(self, response, **kwargs):
         super().check_command_response(response, **kwargs)
 
 
 class MigrateIndexCommandTestCase(SearchCommandTestCase, test.TestCase):
-    command_name = 'migrate_index'
+    command_name = "migrate_index"
 
     def setUp(self):
         super().setUp()
 
-        G(Model, name='Test2', new_field='Hack the Gibson.')
-        ModelSearch.attribute_fields.append('new_field')
+        G(Model, name="Test2", new_field="Hack the Gibson.")
+        ModelSearch.attribute_fields.append("new_field")
 
     def check_command_response(self, response, **kwargs):
         super().check_command_response(response, **kwargs)
 
-        self.assertEqual(Model.search.query('match', ngram='Test').count(), 2)
-        self.assertEqual(Model.search.query('match', new_field='Hack the Gibson.').count(), 1)
+        self.assertEqual(Model.search.query("match", ngram="Test").count(), 2)
+        self.assertEqual(
+            Model.search.query("match", new_field="Hack the Gibson.").count(), 1
+        )
