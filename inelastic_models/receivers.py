@@ -81,9 +81,9 @@ def should_index(sender, instance, signal=None):
     if sender not in get_search_models():
         return False
 
-    if signal is not None and signal in [signals.m2m_changed, signals.post_delete]:
+    if signal is not None and signal == signals.post_delete:
         logger.debug(
-            "Marking captured m2m/deletion of '{}' as should_index.".format(instance)
+            "Marking deletion of '{}' as should_index.".format(instance)
         )
         return True
 
@@ -163,22 +163,13 @@ def handle_m2m(sender, **kwargs):
 
         instance._inelasticmodels_m2m_dependents = {model_cls: pk_set}
 
-    elif m2m_action == "post_clear":
-        logger.debug("M2M dependents of '{}' on {}".format(m2m_action, instance))
-        logger.debug("- {}".format(instance._inelasticmodels_m2m_dependents))
-
-        if reverse:
-            dependents = instance._inelasticmodels_m2m_dependents.pop(model_cls)
-            for pk in dependents:
-                dependent = model_cls.objects.get(pk=pk)
-                update_search_index(
-                    model_cls, instance=dependent, signal=kwargs["signal"]
-                )
-        else:
-            update_search_index(model_cls, instance=instance, signal=kwargs["signal"])
-
     elif m2m_action.startswith("pre_"):
         queryset = model_cls.objects.filter(pk__in=kwargs.get("pk_set"))
+
+        # stores related objects to be handled by post_save on instance
+        # as well as post_{add,remove} on the m2m relation in the case that
+        # this codepath is not within a pre_save/post_save transaction on
+        # the record given by instance.
         instance._inelasticmodels_m2m_dependents = {
             model_cls: set(queryset.values_list("pk", flat=True))
         }
@@ -187,15 +178,33 @@ def handle_m2m(sender, **kwargs):
         logger.debug("M2M dependents of '{}' on {}".format(m2m_action, instance))
         logger.debug("- {}".format(instance._inelasticmodels_m2m_dependents))
 
-        if reverse:
-            dependents = instance._inelasticmodels_m2m_dependents.pop(model_cls)
-            for pk in dependents:
-                dependent = model_cls.objects.get(pk=pk)
-                update_search_index(
-                    model_cls, instance=dependent, signal=kwargs["signal"]
+        for model, pk_set in instance._inelasticmodels_m2m_dependents.items():
+            m2m_name = str(model._meta.verbose_name)
+
+            if not is_indexed(model, None) or is_suspended(model, None):
+                logger.debug("Skipping dependency indexing for '{}'".format(m2m_name))
+                continue
+
+            logger.debug(
+                "Dispatching update of {} {} records...".format(len(pk_set), m2m_name)
+            )
+            queryset = model._search_meta().get_base_qs()
+            for record in queryset.filter(pk__in=pk_set).iterator():
+                logger.debug(
+                    "Dispatching update of {} {}...".format(record, record._meta.model)
                 )
-        else:
-            update_search_index(model_cls, instance=instance, signal=kwargs["signal"])
+                update_search_index(
+                    record._meta.model,
+                    instance=record,
+                    signal=kwargs["signal"]
+                )
+
+        parent_model = instance._meta.model
+        parent_name = str(instance._meta.verbose_name)
+        logger.debug(
+            "Dispatching update of {} record {}...".format(parent_name, instance)
+        )
+        update_search_index(parent_model, instance=instance, signal=kwargs["signal"])
 
 
 @receiver(signals.post_delete)
@@ -250,23 +259,7 @@ def update_search_index(sender, **kwargs):
         for record in queryset.filter(pk__in=pk_set).iterator():
             update_search_index(model, instance=record)
 
-    # Pass 2: Process many-to-many index dependencies of `instance`
-    m2m_dependents = getattr(instance, "_inelasticmodels_m2m_dependents", {})
-    for model, pk_set in m2m_dependents.items():
-        m2m_name = str(model._meta.verbose_name)
-
-        if not is_indexed(model, None) or is_suspended(model, None):
-            logger.debug("Skipping dependency indexing for '{}'".format(m2m_name))
-            continue
-
-        logger.debug(
-            "Dispatching update of {} {} records...".format(len(pk_set), m2m_name)
-        )
-        queryset = model._search_meta().get_base_qs()
-        for record in queryset.filter(pk__in=pk_set).iterator():
-            update_search_index(model, instance=record)
-
-    # Pass 3: Process index for `instance`
+    # Pass 2: Process index for `instance`
     handler = get_handler(type(instance))
     if handler is not None:
         logger.info("Indexing '{}' ({})...".format(instance, model_name))
