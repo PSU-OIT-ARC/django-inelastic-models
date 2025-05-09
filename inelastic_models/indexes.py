@@ -1,11 +1,12 @@
 import threading
 import logging
+import pprint
 import gc
 
 from elasticsearch.helpers import bulk, BulkIndexError
 from elasticsearch import Elasticsearch
 from elasticsearch import exceptions
-import elasticsearch_dsl as dsl
+import elasticsearch.dsl as dsl
 
 from django.conf import settings
 from django.apps import apps
@@ -21,13 +22,15 @@ CHUNKSIZE = 1000
 
 
 def get_client(connection):
-    es_client = getattr(CACHE, 'es_client', None)
+    es_client = getattr(CACHE, "es_client", None)
     if es_client is None:
         config = settings.ELASTICSEARCH_CONNECTIONS[connection]
-        (host_list, options) = (config.get('HOSTS', []),
-                                config.get('CONNECTION_OPTIONS', {}))
+        (host_list, options) = (
+            config.get("HOSTS", []),
+            config.get("CONNECTION_OPTIONS", {}),
+        )
         es_client = Elasticsearch(hosts=host_list, **options)
-        setattr(CACHE, 'es_client', es_client)
+        setattr(CACHE, "es_client", es_client)
 
     return es_client
 
@@ -48,10 +51,10 @@ def queryset_iterator(queryset, chunksize=CHUNKSIZE):
     assert queryset.exists(), "Can't iterate over empty queryset"
 
     ordering = queryset.model._meta.pk.get_attname()
-    pk = getattr(queryset.order_by('-{}'.format(ordering))[0], ordering) + 1
+    pk = getattr(queryset.order_by("-{}".format(ordering))[0], ordering) + 1
     last_pk = getattr(queryset.order_by(ordering)[0], ordering)
 
-    queryset = queryset.order_by('-{}'.format(ordering))
+    queryset = queryset.order_by("-{}".format(ordering))
     total = 0
     while pk > last_pk:
         chunk = queryset.filter(pk__lt=pk)[:chunksize]
@@ -66,13 +69,14 @@ def queryset_iterator(queryset, chunksize=CHUNKSIZE):
     logger.info("Iterated {} records".format(total))
 
 
-class AwareResult(dsl.response.Hit):
+class TypeAwareSerializableHit(dsl.response.Hit):
     def __init__(self, document, search_meta):
         super().__init__(document)
 
         for name, field in search_meta.get_fields().items():
             if name not in self:
                 continue
+
             self[name] = field.to_python(self[name])
 
             # Support query result serialization (e.g., JSON) by translating
@@ -86,12 +90,16 @@ class AwareResult(dsl.response.Hit):
     def make_callback(cls, search_meta):
         def callback(document):
             return cls(document, search_meta)
+
+        callback._matches = lambda x: True
         return callback
 
 
 class Search(FieldMappingMixin):
-    connection = getattr(settings, 'ELASTICSEARCH_DEFAULT_CONNECTION', 'default')
-    date_field = 'modified_on'
+    connection = getattr(settings, "ELASTICSEARCH_DEFAULT_CONNECTION", "default")
+    handler = getattr(settings, "ELASTICSEARCH_INDEX_HANDLER", None)
+
+    date_field = "modified_on"
 
     # A dictionary whose keys are other models that this model's index
     # depends on, and whose values are query set paramaters for this model
@@ -102,6 +110,16 @@ class Search(FieldMappingMixin):
     # BlogPost.objects.filter(author=instance) to be re-indexed.
     dependencies = {}
 
+    # By default, an index update will determine whether or not additional
+    # indexes are related to a given record and will dispatch updates
+    # according to the relationships described in 'get_dependencies()'.
+    #
+    # To disable this behavior, set the following attribute to False.
+    #
+    # To extend or otherwise change this behavior, override the interface
+    # method 'should_dispatch_dependencies'.
+    dispatch_dependencies = True
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -109,66 +127,177 @@ class Search(FieldMappingMixin):
 
     @classmethod
     def bind_to_model(cls, model):
-        setattr(model, 'Search', cls)
+        setattr(model, "Search", cls)
 
     @classmethod
-    def as_field(cls, attr, model, field_type):
+    def as_field(cls, attr, model, field_type, source_fields=None, use_all_field=None):
         class _inner(field_type):
-            mapping_type = 'object'
+            mapping_type = "object"
+
+        def _filter_fields(fields):
+            if source_fields is None:
+                return fields
+            if isinstance(fields, list):
+                return [f for f in fields if f in source_fields]
+            if isinstance(fields, dict):
+                return dict([(k, v) for k, v in fields.items() if k in source_fields])
+
         field = _inner(
             attr,
             model=model,
-            attribute_fields=cls.attribute_fields,
-            template_fields=cls.template_fields,
-            other_fields=cls.other_fields
+            attribute_fields=_filter_fields(cls.attribute_fields),
+            template_fields=_filter_fields(cls.template_fields),
+            other_fields=_filter_fields(cls.other_fields),
         )
-        field.use_all_field = cls.use_all_field
+        field.use_all_field = (
+            cls.use_all_field if use_all_field is None else use_all_field
+        )
         return field
 
     def get_settings(self):
         field_settings = super().get_settings()
         if self.use_all_field:
-            field_settings = merge([field_settings,
-                                    KitchenSinkField().get_field_settings()])
+            field_settings = merge(
+                [field_settings, KitchenSinkField().get_field_settings()]
+            )
         return field_settings
 
     def get_mapping(self):
         mapping = super().get_mapping()
         if self.use_all_field:
             all_field = KitchenSinkField().get_field_mapping()
-            mapping['properties'][self.all_field_name] = all_field
+            mapping["properties"][self.all_field_name] = all_field
         return mapping
 
     def get_index(self):
-        index_name = settings.ELASTICSEARCH_CONNECTIONS[self.connection]['INDEX_NAME']
-        return '{}--{}'.format(index_name, self.get_doc_type())
+        index_name = settings.ELASTICSEARCH_CONNECTIONS[self.connection]["INDEX_NAME"]
+        return "{}--{}".format(index_name, self.get_doc_type())
 
     def get_doc_type(self):
         return "{}_{}".format(self.model._meta.app_label, self.model._meta.model_name)
 
     def get_field_type(self, fieldname):
         mapping = self.get_mapping()
-        for field in fieldname.split('.'):
-            mapping = mapping['properties'].get(field, None)
+        for field in fieldname.split("."):
+            mapping = mapping["properties"].get(field, None)
             if mapping is None:
                 return None
 
-        return mapping['type']
+        return mapping["type"]
+
+    def has_index_changed(self, instance, fields=None):
+        """
+        Evaluates whether any indexed fields have changed on instance.
+        """
+        index_entry = self.get_entry_mapping(instance)
+        if index_entry is None:
+            logger.debug(
+                "No matching index entry for '{}' in {} (fields={}) found".format(
+                    instance, self.get_doc_type(), fields
+                )
+            )
+            return True
+
+        for name, field in self.get_fields().items():
+            if fields is not None and name not in fields:
+                logger.debug("Skipping field '{}'...".format(name))
+                continue
+
+            index_value = index_entry.get(name)
+            instance_value = field.get_from_instance(instance)
+
+            if (
+                    not isinstance(instance_value, type(None))
+                    and not isinstance(index_value, type(None))
+                    and not isinstance(index_value, type(instance_value))
+            ):
+                logger.debug(
+                    "Ignoring non-matching types {}, {}".format(
+                        type(index_value), type(instance_value)
+                    )
+                )
+            elif hasattr(field, "model") and hasattr(field.model, "_search_meta"):
+                if isinstance(instance_value, dict) and instance_value:
+                    _queryset = field.model._search_meta().get_base_qs()
+                    _maybe_instance = _queryset.filter(pk=instance_value.get("pk"))
+                    if (
+                        _maybe_instance.exists()
+                        and field.model._search_meta().has_index_changed(
+                            _maybe_instance.get(), fields=field.get_fields().keys()
+                        )
+                    ):
+                        return True
+                elif isinstance(instance_value, list) and instance_value:
+                    for _el in instance_value:
+                        _queryset = field.model._search_meta().get_base_qs()
+                        _maybe_instance = _queryset.filter(pk=_el.get("pk"))
+                        if (
+                            _maybe_instance.exists()
+                            and field.model._search_meta().has_index_changed(
+                                _maybe_instance.get(), fields=field.get_fields().keys()
+                            )
+                        ):
+                            return True
+            elif index_value != instance_value:
+                sep_length = min(80, 2 + len(str(index_value)))
+                logger.debug(
+                    "Found mismatched index element '{}':\n {}\n {}\n {}".format(
+                        name,
+                        pprint.pformat(index_value),
+                        "".join(["^" for i in range(sep_length)]),
+                        pprint.pformat(instance_value),
+                    )
+                )
+                return True
+
+        logger.debug(
+            "Index entry for '{}' in {} (fields={}) has not changed".format(
+                instance, self.get_doc_type(), fields
+            )
+        )
+        return False
+
+    def should_index(self, instance):
+        try:
+            return self.has_index_changed(instance)
+        except Exception as exc:
+            import traceback
+
+            traceback.print_exc()
+            logger.error("Exception during 'should_index': {}".format(str(exc)))
+
+    def should_dispatch_dependencies(self, instance):
+        if not self.dispatch_dependencies:
+            return False
+
+        try:
+            return self.has_index_changed(instance)
+        except Exception as exc:
+            import traceback
+
+            traceback.print_exc()
+            logger.error(
+                "Exception during 'should_dispatch_dependencies': {}".format(str(exc))
+            )
 
     def get_dependencies(self):
         dependencies = self.dependencies.copy()
         for model, query in self.dependencies.items():
             if isinstance(model, str):
-                (app_name, model_name) = model.split('.')
+                (app_name, model_name) = model.split(".")
                 model_cls = apps.get_model(app_name, model_name)
                 dependencies.pop(model)
                 dependencies[model_cls] = query
+
         return dependencies
+
+    def should_index_for_dependency(self, instance, queryset):
+        return queryset.exists()
 
     def get_search(self):
         s = dsl.Search(using=self.client)
         s = s.index(self.get_index())
-        return s.doc_type(**{'_doc': AwareResult.make_callback(self)})
+        return s.doc_type(TypeAwareSerializableHit.make_callback(self))
 
     def create_index(self):
         """
@@ -177,12 +306,12 @@ class Search(FieldMappingMixin):
         index = self.get_index()
         es = get_client(self.connection)
 
-        if self.client.indices.exists(index):
+        if self.client.indices.exists(index=index):
             logger.debug("Deleting index '{}'".format(index))
-            self.client.indices.delete(index)
+            self.client.indices.delete(index=index)
 
         logger.debug("Creating index '{}'".format(index))
-        self.client.indices.create(index)
+        self.client.indices.create(index=index)
 
     def configure_index(self):
         """
@@ -195,17 +324,22 @@ class Search(FieldMappingMixin):
         index = self.get_index()
 
         config = self.get_index_settings()
-        index_settings = config.pop('index', {})
-        if index_settings and index_settings.get('number_of_replicas', None) is not None:
+        index_settings = config.pop("index", {})
+        if (
+            index_settings
+            and index_settings.get("number_of_replicas", None) is not None
+        ):
             log_msg = "Setting number_of_replicas={} on '{}'"
-            logger.debug(log_msg.format(index_settings.get('number_of_replicas'), index))
+            logger.debug(
+                log_msg.format(index_settings.get("number_of_replicas"), index)
+            )
             replica_settings = {
-                'index': {
-                    'number_of_replicas': index_settings.pop('number_of_replicas')
+                "index": {
+                    "number_of_replicas": index_settings.pop("number_of_replicas")
                 }
             }
-            self.client.indices.open(index)
-            self.client.indices.put_settings(replica_settings, index=index)
+            self.client.indices.open(index=index)
+            self.client.indices.put_settings(settings=replica_settings, index=index)
 
             if len(index_settings):
                 config.update(index_settings)
@@ -213,15 +347,15 @@ class Search(FieldMappingMixin):
                 settings = merge([config, settings])
 
         try:
-            self.client.indices.close(index)
+            self.client.indices.close(index=index)
             logger.debug("Updating settings for index '{}': {}".format(index, settings))
-            self.client.indices.put_settings(settings, index=index)
+            self.client.indices.put_settings(settings=settings, index=index)
         except exceptions.RequestError as e:
             if settings:
                 raise e
             logger.debug("No settings to update for index '{}'".format(index))
         finally:
-            self.client.indices.open(index)
+            self.client.indices.open(index=index)
 
     def check_mapping(self):
         mapping = self.get_mapping()
@@ -231,25 +365,33 @@ class Search(FieldMappingMixin):
             return False
 
         def validate_properties(lhs, rhs):
+            if len(lhs) != len(rhs):
+                logger.warning(
+                    "Size of properties differs: {}, {}".format(len(lhs), len(rhs))
+                )
+                return False
+
             for name, info in lhs.items():
                 if name not in rhs:
                     return False
 
                 # the default mapping_type is 'object' and is not explicitly
                 # given as the 'type' parameter of 'properties'.
-                if info.get('type', 'object') != rhs[name].get('type', 'object'):
+                if info.get("type", "object") != rhs[name].get("type", "object"):
                     return False
-                if 'properties' in info:
-                    validate_properties(
-                        info['properties'],
-                        rhs[name]['properties']
-                    )
+                if "properties" in info:
+                    if not validate_properties(
+                        info["properties"], rhs[name]["properties"]
+                    ):
+                        return False
+
             return True
 
         active_mapping = self.client.indices.get_mapping(index=index)
-        document = active_mapping.get(index).get('mappings')
-        return validate_properties(mapping.get('properties'),
-                                   document.get('properties'))
+        document = active_mapping.get(index).get("mappings")
+        return validate_properties(
+            mapping.get("properties"), document.get("properties")
+        )
 
     def put_mapping(self):
         """
@@ -263,7 +405,7 @@ class Search(FieldMappingMixin):
 
         log_msg = "Updating mapping for index '{}': {}"
         logger.debug(log_msg.format(index, mapping))
-        self.client.indices.put_mapping(mapping, index=index)
+        self.client.indices.put_mapping(**mapping, index=index)
 
     def get_base_qs(self):
         # Some objects have a default ordering, which only slows
@@ -281,13 +423,36 @@ class Search(FieldMappingMixin):
 
         qs = qs.filter(**filters)
 
-        if limit:
-            qs = qs[:limit]
-
+        # TODO: is this change acceptable?
         if self.index_ordering is not None:
             qs = qs.order_by(*self.index_ordering)
 
+        if limit:
+            qs = qs[:limit]
+
         return qs
+
+    def get_entry_mapping(self, instance):
+        """
+        Fetches mapping which represents this instance in the index.
+        """
+        try:
+            logger.debug("Getting entry mapping for instance '{}'".format(instance))
+            query = self.get_search().query("match", pk=instance.pk)
+            hits = query.execute().hits
+            if not len(hits):
+                logger.debug("No entries found.".format(instance))
+                return None
+            if len(hits) > 1:
+                logger.debug("Multiple entries found: {}".format(hits))
+                return None
+            return hits[0].to_dict(recursive=True)
+        except exceptions.ConnectionTimeout as exc:
+            msg = "Index entry request for '{}' timed out."
+            logger.warning(msg.format(instance))
+        except exceptions.ConnectionError as exc:
+            msg = "Index entry request for '{}' encountered a connection error."
+            logger.warning(msg.format(instance))
 
     def index_instance(self, instance):
         if self.get_qs().filter(pk=instance.pk).exists():
@@ -297,7 +462,7 @@ class Search(FieldMappingMixin):
                     index=self.get_index(),
                     id=instance.pk,
                     body=self.prepare(instance),
-                    params={'refresh': 'true'}
+                    params={"refresh": "true"},
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Index request for '{}' timed out."
@@ -307,13 +472,15 @@ class Search(FieldMappingMixin):
                 logger.warning(msg.format(instance))
         else:
             try:
-                instance_repr = '{} ({})'.format(instance.__class__.__name__, instance.pk)
+                instance_repr = "{} ({})".format(
+                    instance.__class__.__name__, instance.pk
+                )
                 logger.debug("Un-indexing instance {}".format(instance_repr))
                 self.client.delete(
                     index=self.get_index(),
                     id=instance.pk,
                     ignore=404,
-                    params={'refresh': 'true'}
+                    params={"refresh": "true"},
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Unindex request for '{}' timed out."
@@ -323,13 +490,13 @@ class Search(FieldMappingMixin):
                 logger.warning(msg.format(instance))
 
     def set_index_refresh(self, index, state):
-        index_settings = {'index': {'refresh_interval': None if state else "-1"}}
-        self.client.indices.put_settings(index_settings, index=index)
+        index_settings = {"index": {"refresh_interval": None if state else "-1"}}
+        self.client.indices.put_settings(settings=index_settings, index=index)
         if not state:
             self.client.indices.forcemerge(index=index)
 
     def get_chunksize(self, queryset):
-        chunk_factor = getattr(settings, 'ELASTICSEARCH_INDEX_CHUNK_FACTOR', 20)
+        chunk_factor = getattr(settings, "ELASTICSEARCH_INDEX_CHUNK_FACTOR", 20)
         return CHUNKSIZE * max(1, int(queryset.count() / (CHUNKSIZE * chunk_factor)))
 
     def bulk_index(self, qs):
@@ -349,57 +516,57 @@ class Search(FieldMappingMixin):
             for chunk in queryset_iterator(qs, chunksize=chunksize):
                 try:
                     actions = [
-                        {'_index': index,
-                         '_id': instance.pk,
-                         '_source': self.prepare(instance)}
+                        {
+                            "_index": index,
+                            "_id": instance.pk,
+                            "_source": self.prepare(instance),
+                        }
                         for instance in chunk.iterator()
                     ]
                     responses.append(
                         bulk(
                             client=self.client,
                             actions=tuple(actions),
-                            params={'refresh': 'true'}
+                            params={"refresh": "true"},
                         )
                     )
                 except BulkIndexError as e:
                     logger.error("Failure during bulk index: {}".format(e))
                 except exceptions.ConnectionTimeout as exc:
-                    msg = "Bulk index request timed out."
-                    logger.warning(msg.format(instance))
+                    logger.warning("Bulk index request timed out.")
                 except exceptions.ConnectionError as exc:
-                    msg = "Bulk index request encountered a connection error."
-                    logger.warning(msg.format(instance))
+                    logger.warning("Bulk index request encountered a connection error.")
 
             return responses
 
         except AssertionError:
             try:
                 actions = [
-                    {'_index': index,
-                     '_id': instance.pk,
-                     '_source': self.prepare(instance)}
+                    {
+                        "_index": index,
+                        "_id": instance.pk,
+                        "_source": self.prepare(instance),
+                    }
                     for instance in qs.iterator()
                 ]
                 return bulk(
                     client=self.client,
                     actions=tuple(actions),
-                    params={'refresh': 'true'}
+                    params={"refresh": "true"},
                 )
             except BulkIndexError as e:
                 logger.error("Failure during bulk index: {}".format(e))
             except exceptions.ConnectionTimeout as exc:
-                msg = "Bulk index request timed out."
-                logger.warning(msg.format(instance))
+                logger.warning("Bulk index request timed out.")
             except exceptions.ConnectionError as exc:
-                msg = "Bulk index request encountered a connection error."
-                logger.warning(msg.format(instance))
+                logger.warning("Bulk index request encountered a connection error.")
 
     def bulk_clear(self):
         index = self.get_index()
 
         try:
             actions = [
-                {'_index': index, '_op_type' : 'delete', '_id': hit.pk}
+                {"_index": index, "_op_type": "delete", "_id": hit.pk}
                 for hit in self.get_search()
             ]
             log_msg = "Removing all {} instances from {})."
@@ -408,7 +575,7 @@ class Search(FieldMappingMixin):
                 client=self.client,
                 actions=tuple(actions),
                 ignore=404,
-                params={'refresh': 'true'}
+                params={"refresh": "true"},
             )
         except BulkIndexError as e:
             logger.error("Failure during bulk clear: {}".format(e))
@@ -423,7 +590,7 @@ class Search(FieldMappingMixin):
         index = self.get_index()
 
         pruned = self.model.objects.difference(self.get_qs())
-        qs = self.model.objects.filter(pk__in=pruned.values_list('pk', flat=True))
+        qs = self.model.objects.filter(pk__in=pruned.values_list("pk", flat=True))
 
         if not qs.exists():
             logger.info("Bulk prune request has no objects to remove. Skipping.")
@@ -439,9 +606,7 @@ class Search(FieldMappingMixin):
             for chunk in queryset_iterator(qs, chunksize=chunksize):
                 try:
                     actions = [
-                        {'_index': index,
-                         '_op_type' : 'delete',
-                         '_id': instance.pk}
+                        {"_index": index, "_op_type": "delete", "_id": instance.pk}
                         for instance in chunk.iterator()
                     ]
                     responses.append(
@@ -449,7 +614,7 @@ class Search(FieldMappingMixin):
                             client=self.client,
                             actions=tuple(actions),
                             ignore=404,
-                            params={'refresh': 'true'}
+                            params={"refresh": "true"},
                         )
                     )
                 except BulkIndexError as e:
@@ -465,16 +630,18 @@ class Search(FieldMappingMixin):
         except AssertionError:
             try:
                 actions = [
-                    {'_index': index,
-                     '_id': instance.pk,
-                     '_source': self.prepare(instance)}
+                    {
+                        "_index": index,
+                        "_id": instance.pk,
+                        "_source": self.prepare(instance),
+                    }
                     for instance in qs.iterator()
                 ]
                 return bulk(
                     client=self.client,
                     actions=tuple(actions),
                     ignore=404,
-                    params={'refresh': 'true'}
+                    params={"refresh": "true"},
                 )
             except BulkIndexError as e:
                 logger.warning("Failure during bulk prune: {}".format(e))
@@ -497,7 +664,7 @@ class SearchDescriptor:
 class SearchMixin:
     @classmethod
     def _search_meta(cls):
-        return getattr(cls, 'Search')(model=cls)
+        return getattr(cls, "Search")(model=cls)
 
     def index(self):
         return self._search_meta().index_instance(self)

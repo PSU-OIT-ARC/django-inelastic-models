@@ -44,7 +44,27 @@ settings.configure(
                 }),
             ],
         },
-    }]
+    }],
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "simple": {"format": "%(asctime)s %(levelname)s [%(name)s] %(message)s"}
+        },
+        "filters": {},
+        "handlers": {
+            "console": {
+                "level": "DEBUG",
+                "class": "logging.StreamHandler",
+                "formatter": "simple",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+            "propagate": False,
+            "level": "WARN",
+        }
+    }
 )
 
 from django import setup

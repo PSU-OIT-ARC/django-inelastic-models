@@ -1,4 +1,8 @@
-version: '3'
+
+
+secrets:
+  ESPassword:
+    file: ./es_password.txt
 
 networks:
   default:
@@ -6,25 +10,31 @@ networks:
 
 services:
   elasticsearch:
-    image: elasticsearch:7.12.0
+    image: elasticsearch:8.18.0
     networks:
       - default
     ports:
-      - "9200:9200"
+      - "9201:9200"
     environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - cluster.name=inelastic_models
-      - bootstrap.memory_lock=true
       - discovery.type=single-node
-    mem_limit: 2g
-    mem_swappiness: 0
+      - xpack.security.enabled=false
+      - node.name=elasticsearch
+      - ELASTIC_PASSWORD_FILE=/run/secrets/ESPassword
+      - ELASTIC_CLIENT_APIVERSIONING=1
+    mem_swappiness: 1
     ulimits:
-      memlock:
-        soft: -1
-        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    secrets:
+      - ESPassword
 
   test:
     build:
-      context: docker
+      context: .
+      dockerfile: docker/Dockerfile
     networks:
       - default
     volumes:

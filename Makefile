@@ -30,14 +30,24 @@ view-docs: port=8000
 view-docs: documentation  ## Launches a Python HTTP server to view docs
 	@$(pipenv_bin)/python -m http.server --bind 0.0.0.0 --dir docs $(port)
 
+check_formatting: target_path="inelastic_models"
+check_formatting:  ## Examines source code given by path. Params 'target_path'
+	@echo "Formatting source tree at '$(target_path)'..."
+	@pipenv run black --check $(target_path)
+
+update_formatting: target_path="inelastic_models"
+update_formatting:  ## Reformats source code given by path. Params 'target_path'
+	@echo "Formatting source tree at '$(target_path)'..."
+	@pipenv run black $(target_path)
+
 update_pip_requirements:  ## Updates python dependencies
 	@echo "Updating Python release requirements..."; echo ""
 	@pipenv --venv || pipenv --python $(pipenv_python)
-	@pipenv check || echo "Review the above safety issues..."
 	@pipenv update --dev
+	@pipenv run pip-audit --disable-pip -r <(pipenv requirements --hash)
+	@pipenv verify || (echo "Verification failed!" && exit 1)
 	@pipenv clean
 	@pipenv run pip list --outdated
-	@pipenv lock --dev --requirements > docker/requirements.txt
 
 test:  ## Run tests
 	@$(pipenv_bin)/python runtests.py
@@ -48,5 +58,6 @@ test-container: install  ## Run tests in a container
 	docker-compose run --rm test make test
 
 upload-dist: install  ## Builds and uploads distribution
-	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(pipenv) bash -
-	rm dist/*.whl
+	@rm -r ./build  # clean any existing build path assets
+	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(pipenv) BUILD_TYPE=bdist_wheel bash -
+	@rm -rf ./*.egg-info

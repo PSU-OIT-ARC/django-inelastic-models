@@ -4,12 +4,17 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-elasticsearch = "~=7.0"
-elasticsearch_dsl = "~=7.0"
-django = "~=3.2"
+python-dateutil = "~=2.9.0"
+elastic-transport = "~=8.0"
+elasticsearch = "~=8.18.0"
+django = ">=4.2,<5.0"
 
 [dev-packages]
+pip-audit = "*"
 textile = "~=4.0.0"
-Sphinx = "~=5.0.0"
-sphinx_rtd_theme = "~=1.0.0"
-django-dynamic-fixture = "*"
+Sphinx = "~=8.2.0"
+sphinx_rtd_theme = "~=3.0.0"
+tblib = "~=3.1.0"
+coverage = "~=7.8.0"
+django-dynamic-fixture = "~=4.0.0"
+black = "~=25.1.0"

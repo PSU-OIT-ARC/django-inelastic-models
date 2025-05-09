@@ -12,6 +12,7 @@ class SearchPostSaveTestCase(SearchBaseTestCase, test.TestCase):
     """
     TBD
     """
+
     def setUp(self):
         super().setUp()
 
@@ -26,39 +27,36 @@ class SearchPostSaveTestCase(SearchBaseTestCase, test.TestCase):
     def test_qs_exclusion(self):
         self.assertEqual(Model.search.count(), 0)
 
-        tm = Model(name=TEST_MODEL_EXCLUDE_NAME)
-        tm.save()
+        tm = self.create_instance(name=TEST_MODEL_EXCLUDE_NAME)
         self.assertEqual(Model.search.count(), 0)
 
-        tm.name="Test3"
+        tm.name = "Test3"
         tm.save()
         self.assertEqual(Model.search.count(), 1)
 
-        tm.name=TEST_MODEL_EXCLUDE_NAME
+        tm.name = TEST_MODEL_EXCLUDE_NAME
         tm.save()
         self.assertEqual(Model.search.count(), 0)
 
     def test_post_delete(self):
-        tm = Model(name="Test4")
-        tm.save()
+        tm = self.create_instance(name="Test4")
         self.assertEqual(Model.search.count(), 1)
 
         tm.delete()
         self.assertEqual(Model.search.count(), 0)
 
     def test_m2m(self):
-        tm = Model(name="Test4")
-        tm.save()
+        tm = self.create_instance(name="Test5")
         self.assertEqual(Model.search.count(), 1)
-        self.assertEqual(Model.search.execute().hits[0].count_m2m, '0')
+        self.assertEqual(Model.search.execute().hits[0].count_m2m, "0")
 
         tm.test_m2m.create()
         self.assertEqual(Model.search.count(), 1)
-        self.assertEqual(Model.search.execute().hits[0].count_m2m, '1')
+        self.assertEqual(Model.search.execute().hits[0].count_m2m, "1")
 
         tm.test_m2m.clear()
         self.assertEqual(Model.search.count(), 1)
-        self.assertEqual(Model.search.execute().hits[0].count_m2m, '0')
+        self.assertEqual(Model.search.execute().hits[0].count_m2m, "0")
 
     def test_suspended_updates(self):
         self.assertEqual(Model.search.count(), 0)

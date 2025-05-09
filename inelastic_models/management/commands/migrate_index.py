@@ -9,7 +9,8 @@ class Command(IndexCommand):
     """
     TBD
     """
-    help = 'Updates the index mapping, if necessary. This operation destroys the existing index.'
+
+    help = "Updates the index mapping, if necessary. This operation destroys the existing index."
 
     def handle_operation(self, search, queryset):
         index = search.get_index()

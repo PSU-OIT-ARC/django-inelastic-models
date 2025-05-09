@@ -2,6 +2,29 @@
 Changelog
 =========
 
+8.0
+---
+
+2025-05-08
+
+This release adds support for, and requires:
+
+* Elasticsearch 8.x.
+* elasticsearch-py >=8.18.0
+* Django 4.2 LTS.
+
+This release significantly refactors indexing operations and code
+paths such that:
+
+* reindexing requests are now validated using a builtin evaluator
+  which determines whether or not the index corresponding to a given
+  index should be considered dirty.
+* index dependencies are now more rigorously computed as a dependency
+  tree and updates are now properly dispatched to dependent indices.
+* additional interfaces have been added to the 'Search' object in
+  order to allow implementations to provide custom logic when
+  considering index updates and dependency dispatching.
+
 7.1
 ---
 

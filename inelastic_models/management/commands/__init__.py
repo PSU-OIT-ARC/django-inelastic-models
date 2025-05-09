@@ -9,18 +9,34 @@ DURATION_RE = re.compile(
     r"(?:(?P<hours>\d+)H)?"
     r"(?:(?P<minutes>\d+)M)?"
     r"(?:(?P<seconds>\d+)S)?$",
-    flags=re.IGNORECASE)
+    flags=re.IGNORECASE,
+)
 
 
 class IndexCommand(BaseCommand):
     def add_arguments(self, parser):
-        parser.add_argument('args', nargs='*', type=str)
-        parser.add_argument('--since', action="store", default='', dest='since',
-                            help='Index data updated after this time.  yyyy-mm-dd[-hh:mm] or [#d][#h][#m][#s]')
-        parser.add_argument('--until', action="store", default='', dest='until',
-                            help='Index data updated before this time.  yyyy-mm-dd[-hh:mm] or [#d][#h][#m][#s]')
-        parser.add_argument('--limit', action="store", default='', dest='limit',
-                            help='Index at most this many of each model.')
+        parser.add_argument("args", nargs="*", type=str)
+        parser.add_argument(
+            "--since",
+            action="store",
+            default="",
+            dest="since",
+            help="Index data updated after this time.  yyyy-mm-dd[-hh:mm] or [#d][#h][#m][#s]",
+        )
+        parser.add_argument(
+            "--until",
+            action="store",
+            default="",
+            dest="until",
+            help="Index data updated before this time.  yyyy-mm-dd[-hh:mm] or [#d][#h][#m][#s]",
+        )
+        parser.add_argument(
+            "--limit",
+            action="store",
+            default="",
+            dest="limit",
+            help="Index at most this many of each model.",
+        )
 
     def parse_date_time(self, timestamp):
         try:
@@ -35,7 +51,11 @@ class IndexCommand(BaseCommand):
 
         match = DURATION_RE.match(timestamp)
         if match:
-            kwargs = dict((k, int(v)) for (k, v) in list(match.groupdict().items()) if v is not None)
+            kwargs = dict(
+                (k, int(v))
+                for (k, v) in list(match.groupdict().items())
+                if v is not None
+            )
             return datetime.now() - timedelta(**kwargs)
 
         raise ValueError("{} could not be interpereted as a datetime".format(timestamp))
@@ -43,9 +63,12 @@ class IndexCommand(BaseCommand):
     def get_models(self, args):
         models = get_search_models()
         if args:
-            models = [m for m in models if
-                      m._meta.app_label in args or
-                      '{}.{}'.format(m._meta.app_label, m._meta.model_name) in args]
+            models = [
+                m
+                for m in models
+                if m._meta.app_label in args
+                or "{}.{}".format(m._meta.app_label, m._meta.model_name) in args
+            ]
 
         return models
 
@@ -58,12 +81,12 @@ class IndexCommand(BaseCommand):
             raise CommandError("No matching indices found.")
 
         since = None
-        if options['since']:
-            since = self.parse_date_time(options['since'])
+        if options["since"]:
+            since = self.parse_date_time(options["since"])
 
         limit = None
-        if options['limit']:
-            limit = int(options['limit'])
+        if options["limit"]:
+            limit = int(options["limit"])
 
         for model in models:
             search = model._search_meta()
