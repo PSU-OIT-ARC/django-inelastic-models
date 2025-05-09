@@ -5,7 +5,7 @@ Changelog
 8.0
 ---
 
-2025-05-??
+2025-05-08
 
 This release adds support for, and requires:
 
