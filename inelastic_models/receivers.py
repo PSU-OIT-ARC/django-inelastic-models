@@ -20,6 +20,21 @@ logger = logging.getLogger(__name__)
 
 
 @functools.lru_cache()
+def get_signal_name(signal):
+    """
+    TBD
+    """
+    if signal == signals.post_save:
+        return "update"
+    elif signal == signals.post_delete:
+        return "delete"
+    elif signal == signals.m2m_changed:
+        return "m2m_changed"
+
+    return "unknown"
+
+
+@functools.lru_cache()
 def get_search_models():
     """
     TBD
@@ -72,7 +87,7 @@ def is_indexed(sender, instance):
     return True
 
 
-def should_index(sender, instance, signal=None):
+def should_index(sender, instance):
     """
     TBD
     """
@@ -80,12 +95,6 @@ def should_index(sender, instance, signal=None):
         sender = type(instance)
     if sender not in get_search_models():
         return False
-
-    if signal is not None and signal == signals.post_delete:
-        logger.debug(
-            "Marking deletion of '{}' as should_index.".format(instance)
-        )
-        return True
 
     return sender._search_meta().should_index(instance)
 
@@ -128,6 +137,64 @@ def get_dependents(instance):
             dependents[model] = set(queryset.values_list("pk", flat=True))
 
     return dependents
+
+
+def process_update(sender, **kwargs):
+    """
+    TBD
+    """
+    (instance, signal) = (kwargs.pop("instance"), kwargs.pop("signal", None))
+    model_name = str(type(instance)._meta.verbose_name)
+    dependents = get_dependents(instance)
+
+    if (
+        not is_indexed(sender, instance)
+        or is_suspended(sender, instance)
+        or (
+            signal != signals.post_delete
+            and not should_index(sender, instance)
+        )
+    ):
+
+        if not dependents:
+            return
+
+        for model, pk_set in dependents.items():
+            dep_name = str(model._meta.verbose_name)
+
+            if not is_indexed(model, None) or is_suspended(model, None):
+                logger.debug("Skipping dependency indexing for '{}'".format(dep_name))
+                continue
+
+            logger.debug(
+                "Dispatching update of {} {} records...".format(len(pk_set), dep_name)
+            )
+            queryset = model._search_meta().get_base_qs()
+            for record in queryset.filter(pk__in=pk_set).iterator():
+                process_update(model, instance=record)
+
+        return
+
+    logger.debug("Dispatching 'process_update' on '{}'".format(instance))
+
+    # Pass 1: Process one-to-{one,many} index dependencies of `instance`
+    for model, pk_set in dependents.items():
+        dep_name = str(model._meta.verbose_name)
+
+        if not is_indexed(model, None) or is_suspended(model, None):
+            logger.debug("Skipping dependency indexing for '{}'".format(dep_name))
+            continue
+
+        logger.debug(
+            "Dispatching update of {} {} records...".format(len(pk_set), dep_name)
+        )
+        queryset = model._search_meta().get_base_qs()
+        for record in queryset.filter(pk__in=pk_set).iterator():
+            process_update(model, instance=record)
+
+    # Pass 2: Process index for `instance`
+    logger.info("Indexing '{}' ({})...".format(instance, model_name))
+    instance.index()
 
 
 @receiver(signals.m2m_changed)
@@ -193,7 +260,7 @@ def handle_m2m(sender, **kwargs):
                 logger.debug(
                     "Dispatching update of {} {}...".format(record, record._meta.model)
                 )
-                update_search_index(
+                handle_instance(
                     record._meta.model,
                     instance=record,
                     signal=kwargs["signal"]
@@ -204,69 +271,36 @@ def handle_m2m(sender, **kwargs):
         logger.debug(
             "Dispatching update of {} record {}...".format(parent_name, instance)
         )
-        update_search_index(parent_model, instance=instance, signal=kwargs["signal"])
+        handle_instance(parent_model, instance=instance, signal=kwargs["signal"])
 
 
-@receiver(signals.post_delete)
 @receiver(signals.post_save)
-def update_search_index(sender, **kwargs):
+@receiver(signals.post_delete)
+def handle_instance(sender, **kwargs):
     """
     TBD
     """
-    instance = kwargs["instance"]
+    (instance, signal) = (kwargs["instance"], kwargs["signal"])
     model_name = str(type(instance)._meta.verbose_name)
-    dependents = get_dependents(instance)
-
-    if (
-        not is_indexed(sender, instance)
-        or is_suspended(sender, instance)
-        or not should_index(sender, instance, signal=kwargs.get("signal"))
-    ):
-
-        if not dependents:
-            return
-
-        for model, pk_set in dependents.items():
-            dep_name = str(model._meta.verbose_name)
-
-            if not is_indexed(model, None) or is_suspended(model, None):
-                logger.debug("Skipping dependency indexing for '{}'".format(dep_name))
-                continue
-
-            logger.debug(
-                "Dispatching update of {} {} records...".format(len(pk_set), dep_name)
-            )
-            queryset = model._search_meta().get_base_qs()
-            for record in queryset.filter(pk__in=pk_set).iterator():
-                update_search_index(model, instance=record)
-
-        return
-
-    logger.debug("Dispatching 'update_search_index' on '{}'".format(instance))
-
-    # Pass 1: Process one-to-{one,many} index dependencies of `instance`
-    for model, pk_set in dependents.items():
-        dep_name = str(model._meta.verbose_name)
-
-        if not is_indexed(model, None) or is_suspended(model, None):
-            logger.debug("Skipping dependency indexing for '{}'".format(dep_name))
-            continue
-
-        logger.debug(
-            "Dispatching update of {} {} records...".format(len(pk_set), dep_name)
-        )
-        queryset = model._search_meta().get_base_qs()
-        for record in queryset.filter(pk__in=pk_set).iterator():
-            update_search_index(model, instance=record)
-
-    # Pass 2: Process index for `instance`
     handler = get_handler(type(instance))
+
     if handler is not None:
-        logger.info("Indexing '{}' ({})...".format(instance, model_name))
-        handler(sender, instance=instance)
+        logger.debug(
+            "Dispatching index update for '{}' ({}) via {}...".format(
+                instance, model_name, get_signal_name(signal)
+            )
+        )
+
+        handler(sender, **kwargs)
+
     else:
-        logger.info("Indexing '{}' ({})...".format(instance, model_name))
-        instance.index()
+        logger.debug(
+            "Processing index update for '{}' ({}) via {}...".format(
+                instance, model_name, get_signal_name(signal)
+            )
+        )
+
+        process_update(sender, **kwargs)
 
 
 @contextmanager
