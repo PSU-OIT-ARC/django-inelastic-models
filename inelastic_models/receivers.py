@@ -1,3 +1,4 @@
+import collections
 import functools
 import importlib
 import logging
@@ -40,6 +41,24 @@ def get_search_models():
     TBD
     """
     return [m for m in apps.get_models() if issubclass(m, SearchMixin)]
+
+
+@functools.lru_cache
+def get_reverse_dependencies():
+    """
+    TBD
+    """
+    reverse_dependencies = collections.defaultdict(list)
+
+    for model in get_search_models():
+        dependencies = model._search_meta().get_dependencies()
+        if not dependencies:
+            continue
+
+        for dep_type, select_param in dependencies.items():
+            reverse_dependencies[dep_type].append((model, select_param))
+
+    return reverse_dependencies
 
 
 @functools.lru_cache()
@@ -103,38 +122,34 @@ def get_dependents(instance):
     """
     TBD
     """
+    reverse_dependencies = get_reverse_dependencies()
     dependents = {}
 
-    if type(instance) in get_search_models():
-        search_meta = type(instance)._search_meta()
-        if not search_meta.should_dispatch_dependencies(instance):
-            return dependents
+    if (
+        not is_indexed(type(instance), None)
+        and type(instance) not in reverse_dependencies
+    ):
+        logger.debug("Skipping non-depended type '{}'".format(type(instance)))
+        return dependents
 
-    logger.debug("Generating dependents for '{}'".format(instance))
-    for model in get_search_models():
-        if isinstance(instance, model):
-            continue
-
-        search_meta = model._search_meta()
-        dependencies = search_meta.get_dependencies()
-
-        for dep_type, select_param in dependencies.items():
-            if not isinstance(instance, dep_type):
-                continue
-
+    for model_type in list(instance._meta.parents.keys()) + [instance._meta.model]:
+        for model, select_param in reverse_dependencies[model_type]:
+            search_meta = model._search_meta()
             queryset = search_meta.get_base_qs().filter(**{select_param: instance})
-            if not search_meta.should_index_for_dependency(
-                instance, queryset
-            ) or not any(
-                [
-                    search_meta.should_dispatch_dependencies(_instance)
-                    for _instance in queryset.iterator()
-                ]
-            ):
+            if not search_meta.should_index_for_dependency(instance, queryset):
                 continue
 
-            logger.debug("- Adding '{}' (via {})".format(model, select_param))
-            dependents[model] = set(queryset.values_list("pk", flat=True))
+            pk_set = set()
+            for _instance in queryset.iterator():
+                if search_meta.should_dispatch_dependencies(_instance):
+                    pk_set.add(_instance.pk)
+
+            logger.debug(
+                "- Adding {} '{}' (via {})".format(
+                    len(pk_set), model._meta.verbose_name, select_param
+                )
+            )
+            dependents[model] = pk_set
 
     return dependents
 
@@ -144,41 +159,12 @@ def process_update(sender, **kwargs):
     TBD
     """
     (instance, signal) = (kwargs.pop("instance"), kwargs.pop("signal", None))
-    model_name = str(type(instance)._meta.verbose_name)
-    dependents = get_dependents(instance)
-
-    if (
-        not is_indexed(sender, instance)
-        or is_suspended(sender, instance)
-        or (
-            signal != signals.post_delete
-            and not should_index(sender, instance)
-        )
-    ):
-
-        if not dependents:
-            return
-
-        for model, pk_set in dependents.items():
-            dep_name = str(model._meta.verbose_name)
-
-            if not is_indexed(model, None) or is_suspended(model, None):
-                logger.debug("Skipping dependency indexing for '{}'".format(dep_name))
-                continue
-
-            logger.debug(
-                "Dispatching update of {} {} records...".format(len(pk_set), dep_name)
-            )
-            queryset = model._search_meta().get_base_qs()
-            for record in queryset.filter(pk__in=pk_set).iterator():
-                process_update(model, instance=record)
-
-        return
+    model_name = str(instance._meta.verbose_name)
 
     logger.debug("Dispatching 'process_update' on '{}'".format(instance))
 
-    # Pass 1: Process one-to-{one,many} index dependencies of `instance`
-    for model, pk_set in dependents.items():
+    # Process index dependencies of `instance`
+    for model, pk_set in get_dependents(instance).items():
         dep_name = str(model._meta.verbose_name)
 
         if not is_indexed(model, None) or is_suspended(model, None):
@@ -192,8 +178,17 @@ def process_update(sender, **kwargs):
         for record in queryset.filter(pk__in=pk_set).iterator():
             process_update(model, instance=record)
 
-    # Pass 2: Process index for `instance`
-    logger.info("Indexing '{}' ({})...".format(instance, model_name))
+    if (
+        not is_indexed(sender, instance)
+        or is_suspended(sender, instance)
+        or (
+            signal != signals.post_delete
+            and not should_index(sender, instance)
+        )
+    ):
+        return
+
+    # Process index for `instance`
     instance.index()
 
 
@@ -249,7 +244,7 @@ def handle_m2m(sender, **kwargs):
             m2m_name = str(model._meta.verbose_name)
 
             if not is_indexed(model, None) or is_suspended(model, None):
-                logger.debug("Skipping dependency indexing for '{}'".format(m2m_name))
+                logger.debug("Skipping dispatch of update for '{}'".format(m2m_name))
                 continue
 
             logger.debug(
@@ -268,6 +263,11 @@ def handle_m2m(sender, **kwargs):
 
         parent_model = instance._meta.model
         parent_name = str(instance._meta.verbose_name)
+
+        if not is_indexed(parent_model, None) or is_suspended(parent_model, None):
+            logger.debug("Skipping dispatch of update for '{}'".format(parent_name))
+            return
+
         logger.debug(
             "Dispatching update of {} record {}...".format(parent_name, instance)
         )
@@ -281,7 +281,7 @@ def handle_instance(sender, **kwargs):
     TBD
     """
     (instance, signal) = (kwargs["instance"], kwargs["signal"])
-    model_name = str(type(instance)._meta.verbose_name)
+    model_name = str(instance._meta.verbose_name)
     handler = get_handler(type(instance))
 
     if handler is not None:
@@ -312,6 +312,8 @@ def suspended_updates(models=None, permanent=False, slop=timedelta(seconds=10)):
 
     try:
         search_models = get_search_models()
+        reverse_dependencies = get_reverse_dependencies()
+
         if models is None:
             models = search_models
         models = set(models)
@@ -327,9 +329,12 @@ def suspended_updates(models=None, permanent=False, slop=timedelta(seconds=10)):
         if permanent is True:
             return
 
-        search_models = get_search_models()
-        for model in search_models:
-            search_meta = model._search_meta()
-            if model in models or models.intersection(search_meta.dependencies):
-                qs = search_meta.get_qs(since=start)
-                search_meta.bulk_index(qs)
+        for model in models:
+            if is_indexed(model, None):
+                search_meta = model._search_meta()
+                queryset = search_meta.get_qs(since=start)
+                search_meta.bulk_index(queryset)
+            for dependency, select_param in reverse_dependencies[model]:
+                search_meta = dependency._search_meta()
+                queryset = search_meta.get_qs(since=start)
+                search_meta.bulk_index(queryset)
