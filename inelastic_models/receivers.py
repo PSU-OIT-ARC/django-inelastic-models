@@ -181,10 +181,7 @@ def process_update(sender, **kwargs):
     if (
         not is_indexed(sender, instance)
         or is_suspended(sender, instance)
-        or (
-            signal != signals.post_delete
-            and not should_index(sender, instance)
-        )
+        or (signal != signals.post_delete and not should_index(sender, instance))
     ):
         return
 
@@ -256,9 +253,7 @@ def handle_m2m(sender, **kwargs):
                     "Dispatching update of {} {}...".format(record, record._meta.model)
                 )
                 handle_instance(
-                    record._meta.model,
-                    instance=record,
-                    signal=kwargs["signal"]
+                    record._meta.model, instance=record, signal=kwargs["signal"]
                 )
 
         parent_model = instance._meta.model

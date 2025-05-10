@@ -207,9 +207,9 @@ class Search(FieldMappingMixin):
             instance_value = field.get_from_instance(instance)
 
             if (
-                    not isinstance(instance_value, type(None))
-                    and not isinstance(index_value, type(None))
-                    and not isinstance(index_value, type(instance_value))
+                not isinstance(instance_value, type(None))
+                and not isinstance(index_value, type(None))
+                and not isinstance(index_value, type(instance_value))
             ):
                 logger.debug(
                     "Ignoring non-matching types {}, {}".format(

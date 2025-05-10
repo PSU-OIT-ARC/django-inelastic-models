@@ -2,6 +2,19 @@
 Changelog
 =========
 
+8.0.1
+-----
+
+2025-05-12
+
+This point release fixes several bugs and addresses shortcomings
+in the backwards-incompatible 8.0 release series.
+
+This release includes further significant refactoring of the
+signal- and dependency-handling code and should be considered an
+immediate replacement of the initial 8.0 release which has been
+pulled in order to prevent further use in the wild.
+
 8.0
 ---
 
