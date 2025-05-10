@@ -6,6 +6,18 @@ from django import VERSION
 
 ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST', 'http://elasticsearch:9200')
 
+# Logging configuration
+FIRST_PARTY_LOGGER = {
+    "handlers": ["console"],
+    "propagate": False,
+    "level": "INFO",
+}
+THIRD_PARTY_LOGGER = {
+    "handlers": ["console"],
+    "propagate": False,
+    "level": "WARN",
+}
+
 
 settings.configure(
     DEBUG=False,
@@ -59,11 +71,10 @@ settings.configure(
                 "formatter": "simple",
             },
         },
-        "root": {
-            "handlers": ["console"],
-            "propagate": False,
-            "level": "WARN",
-        }
+        "loggers": {
+            "inelastic_models": FIRST_PARTY_LOGGER
+        },
+        "root": THIRD_PARTY_LOGGER,
     }
 )
 
