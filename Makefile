@@ -49,6 +49,9 @@ update_pip_requirements:  ## Updates python dependencies
 	@pipenv clean
 	@pipenv run pip list --outdated
 
+release: documentation update_formatting ## Performs bookkeeping necessary for a new release
+	@echo "Created new release"
+
 test:  ## Run tests
 	@$(pipenv_bin)/python runtests.py
 
