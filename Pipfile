@@ -5,9 +5,8 @@ name = "pypi"
 
 [packages]
 python-dateutil = "~=2.9.0"
-elastic-transport = "~=8.0"
-elasticsearch = "~=8.18.0"
-django = ">=4.2,<5.0"
+elasticsearch = "~=9.1.0"
+django = ">=4.2,<6.0"
 
 [dev-packages]
 pip-audit = "*"

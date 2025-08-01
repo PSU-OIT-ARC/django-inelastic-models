@@ -91,6 +91,8 @@ classifiers = [  # Optional
   # checked by "pip install". See instead "python_requires" below.
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3 :: Only",
 ]
 
@@ -102,8 +104,8 @@ classifiers = [  # Optional
 # https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [ # Optional
   'python-dateutil >= 2.8.0, <3.0',
-  'elasticsearch ~= 8.18.0',
-  'django >= 4.2, <5.0'
+  'elasticsearch ~= 9.1.0',
+  'django >= 4.2, <6.0'
 ]
 
 # List additional groups of dependencies here (e.g. development
