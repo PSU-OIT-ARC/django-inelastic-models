@@ -462,7 +462,7 @@ class Search(FieldMappingMixin):
                     index=self.get_index(),
                     id=instance.pk,
                     body=self.prepare(instance),
-                    params={"refresh": "true"},
+                    refresh=True,
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Index request for '{}' timed out."
@@ -479,8 +479,7 @@ class Search(FieldMappingMixin):
                 self.client.delete(
                     index=self.get_index(),
                     id=instance.pk,
-                    ignore=404,
-                    params={"refresh": "true"},
+                    refresh=True,
                 )
             except exceptions.ConnectionTimeout as exc:
                 msg = "Unindex request for '{}' timed out."
@@ -527,7 +526,7 @@ class Search(FieldMappingMixin):
                         bulk(
                             client=self.client,
                             actions=tuple(actions),
-                            params={"refresh": "true"},
+                            refresh=True,
                         )
                     )
                 except BulkIndexError as e:
@@ -552,7 +551,7 @@ class Search(FieldMappingMixin):
                 return bulk(
                     client=self.client,
                     actions=tuple(actions),
-                    params={"refresh": "true"},
+                    refresh=True,
                 )
             except BulkIndexError as e:
                 logger.error("Failure during bulk index: {}".format(e))
@@ -574,8 +573,8 @@ class Search(FieldMappingMixin):
             return bulk(
                 client=self.client,
                 actions=tuple(actions),
-                ignore=404,
-                params={"refresh": "true"},
+                ignore_status=[404],
+                refresh=True,
             )
         except BulkIndexError as e:
             logger.error("Failure during bulk clear: {}".format(e))
@@ -613,8 +612,8 @@ class Search(FieldMappingMixin):
                         bulk(
                             client=self.client,
                             actions=tuple(actions),
-                            ignore=404,
-                            params={"refresh": "true"},
+                            ignore_status=[404],
+                            refresh=True,
                         )
                     )
                 except BulkIndexError as e:
@@ -640,8 +639,8 @@ class Search(FieldMappingMixin):
                 return bulk(
                     client=self.client,
                     actions=tuple(actions),
-                    ignore=404,
-                    params={"refresh": "true"},
+                    ignore_status=[404],
+                    refresh=True
                 )
             except BulkIndexError as e:
                 logger.warning("Failure during bulk prune: {}".format(e))
