@@ -1,7 +1,7 @@
 from django.db import models
 
-from ..indexes import SearchMixin, Search
-from ..fields import (
+from inelastic_models.indexes import SearchMixin, Search
+from inelastic_models.fields import (
     CharField,
     TextField,
     NGramField,

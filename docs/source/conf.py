@@ -19,7 +19,7 @@ import sphinx_rtd_theme
 
 
 # Adds path support for 'django-inelastic-models' package
-sys.path.insert(0, os.path.abspath('../../'))
+sys.path.insert(0, os.path.abspath('../../src'))
 
 
 # -- General configuration -----------------------------------------------------

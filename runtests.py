@@ -34,7 +34,7 @@ settings.configure(
         'inelastic_models',
     ),
     MIGRATION_MODULES={
-        'inelastic_models': 'inelastic_models.test_migrations'
+        'inelastic_models': 'tests.migrations'
     },
     MIDDLEWARE_CLASSES=[],
     ELASTICSEARCH_CONNECTIONS={
@@ -82,8 +82,8 @@ from django import setup
 setup()
 
 
-from inelastic_models.tests import SearchTestRunner
+from tests import SearchTestRunner
 test_runner = SearchTestRunner(verbosity=1)
-failures = test_runner.run_tests(['inelastic_models.tests'])
+failures = test_runner.run_tests(['tests'])
 if failures:
     sys.exit(failures)

@@ -117,15 +117,6 @@ dependencies = [ # Optional
 # Similar to `dependencies` above, these must be valid existing
 # projects.
 [project.optional-dependencies] # Optional
-dev = [
-  'textile ~= 4.0.0',
-  'Sphinx ~= 8.2.0',
-  'sphinx_rtd_theme ~= 3.0.0',
-  'tblib ~= 3.1.0',
-  'coverage ~= 7.8.0',
-  'django-dynamic-fixture ~= 4.0.0',
-  'black ~= 25.1.0'
-]
 
 # List URLs that are relevant to your project
 #
@@ -155,9 +146,9 @@ package-data = {"inelastic_models" = []}
 
 [tool.setuptools.packages.find]
 # All the following settings are optional:
-where = ["."]  # ["."] by default
-exclude = []  # empty by default
-namespaces = false  # true by default
+where = ["src"]
+include = ["inelastic_models"]
+namespaces = false
 
 [tool.setuptools.dynamic]
 version = {attr = "inelastic_models.__version__"}

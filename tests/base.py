@@ -1,8 +1,8 @@
 from django_dynamic_fixture import G
 from django.test.runner import DiscoverRunner
 
-from inelastic_models.models.test import Model, SearchFieldModel
 from inelastic_models.receivers import get_search_models
+from tests.models import Model, SearchFieldModel
 
 
 class SearchTestRunner(DiscoverRunner):
