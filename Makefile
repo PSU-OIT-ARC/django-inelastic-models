@@ -59,7 +59,7 @@ test-container:  ## Run tests in a container
 	@docker-compose build test
 	@docker-compose run --rm test make test
 
-upload-dist: install  ## Builds and uploads distribution
+upload-dist: test-container ## Builds and uploads distribution
 	@rm -r ./build || echo "No existing build assets to remove..."  # clean any existing build path assets
-	curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=$(pipenv) BUILD_TYPE=bdist_wheel bash -
+	@curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=`pipenv --venv` BUILD_TYPE=bdist_wheel bash -
 	@rm -rf ./*.egg-info
