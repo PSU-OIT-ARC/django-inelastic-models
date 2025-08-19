@@ -481,6 +481,9 @@ class Search(FieldMappingMixin):
                     id=instance.pk,
                     refresh=True,
                 )
+            except exceptions.NotFoundError as exc:
+                msg = "Instance {} not found in index"
+                logger.warning(msg.format(instance))
             except exceptions.ConnectionTimeout as exc:
                 msg = "Unindex request for '{}' timed out."
                 logger.warning(msg.format(instance))
