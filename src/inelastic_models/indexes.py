@@ -643,7 +643,7 @@ class Search(FieldMappingMixin):
                     client=self.client,
                     actions=tuple(actions),
                     ignore_status=[404],
-                    refresh=True
+                    refresh=True,
                 )
             except BulkIndexError as e:
                 logger.warning("Failure during bulk prune: {}".format(e))

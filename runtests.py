@@ -4,7 +4,7 @@ import os
 from django.conf import settings
 from django import VERSION
 
-ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST', 'http://elasticsearch:9200')
+ELASTICSEARCH_HOST = os.environ.get("ELASTICSEARCH_HOST", "http://elasticsearch:9200")
 
 # Logging configuration
 FIRST_PARTY_LOGGER = {
@@ -22,42 +22,42 @@ THIRD_PARTY_LOGGER = {
 settings.configure(
     DEBUG=False,
     DATABASES={
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
         }
     },
     INSTALLED_APPS=(
-        'django.contrib.auth',
-        'django.contrib.contenttypes',
-        'django.contrib.sessions',
-
-        'inelastic_models',
+        "django.contrib.auth",
+        "django.contrib.contenttypes",
+        "django.contrib.sessions",
+        "inelastic_models",
     ),
-    MIGRATION_MODULES={
-        'inelastic_models': 'tests.migrations'
-    },
+    MIGRATION_MODULES={"inelastic_models": "tests.migrations"},
     MIDDLEWARE_CLASSES=[],
     ELASTICSEARCH_CONNECTIONS={
-        'default': {
-            'HOSTS': [ELASTICSEARCH_HOST],
-            'INDEX_NAME': 'inelastic_models',
-            'INDEX_OPTIONS': {
-                'max_ngram_diff': 2
-            }
+        "default": {
+            "HOSTS": [ELASTICSEARCH_HOST],
+            "INDEX_NAME": "inelastic_models",
+            "INDEX_OPTIONS": {"max_ngram_diff": 2},
         }
     },
-    TEMPLATES=[{
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'OPTIONS': {
-            'context_processors': ['django.contrib.auth.context_processors.auth'],
-            'loaders': [
-                ('django.template.loaders.locmem.Loader', {
-                    'test_index_template_name.txt': 'Template_{{ object.name }}',
-                }),
-            ],
-        },
-    }],
-    LOGGING = {
+    TEMPLATES=[
+        {
+            "BACKEND": "django.template.backends.django.DjangoTemplates",
+            "OPTIONS": {
+                "context_processors": ["django.contrib.auth.context_processors.auth"],
+                "loaders": [
+                    (
+                        "django.template.loaders.locmem.Loader",
+                        {
+                            "test_index_template_name.txt": "Template_{{ object.name }}",
+                        },
+                    ),
+                ],
+            },
+        }
+    ],
+    LOGGING={
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
@@ -71,19 +71,19 @@ settings.configure(
                 "formatter": "simple",
             },
         },
-        "loggers": {
-            "inelastic_models": FIRST_PARTY_LOGGER
-        },
+        "loggers": {"inelastic_models": FIRST_PARTY_LOGGER},
         "root": THIRD_PARTY_LOGGER,
-    }
+    },
 )
 
 from django import setup
+
 setup()
 
 
 from tests import SearchTestRunner
+
 test_runner = SearchTestRunner(verbosity=1)
-failures = test_runner.run_tests(['tests'])
+failures = test_runner.run_tests(["tests"])
 if failures:
     sys.exit(failures)
