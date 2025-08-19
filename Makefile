@@ -22,10 +22,11 @@ help:
 
 update_requirements:  ## Updates project dependencies
 	@echo "Updating Python release requirements..."; echo ""
-	@pipenv --venv || pipenv --python $(pipenv_python)
+	@pipenv --venv || (pipenv --python $(pipenv_python) && pipenv install)
 	@pipenv update --dev
 	@pipenv update --outdated || echo "Review the above outdated packages..."
 	@pipenv verify || (echo "Verification failed!" && exit 1)
+	@pipenv run pip-audit --disable-pip -r <(pipenv requirements --hash) || (echo "Vulnerabilities found." && exit 1)
 	@pipenv clean
 
 documentation:  ## Builds the currently available documentation.
@@ -61,5 +62,5 @@ test-container:  ## Run tests in a container
 
 upload-dist: test-container ## Builds and uploads distribution
 	@rm -r ./build || echo "No existing build assets to remove..."  # clean any existing build path assets
-	@curl -XGET https://packages.wdt.pdx.edu/publish.sh | VENV=`pipenv --venv` BUILD_TYPE=bdist_wheel bash -
+	@bash publish_package.sh
 	@rm -rf ./*.egg-info

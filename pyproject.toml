@@ -103,9 +103,9 @@ classifiers = [  # Optional
 # For an analysis of this field vs pip's requirements files see:
 # https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [ # Optional
-  'python-dateutil >= 2.8.0, <3.0',
-  'elasticsearch ~= 9.1.0',
-  'django >= 4.2, <6.0'
+  "python-dateutil >=2.8.0, <3.0",
+  "elasticsearch ~= 9.1.0",
+  "django >=4.2, <6.0"
 ]
 
 # List additional groups of dependencies here (e.g. development
@@ -140,15 +140,11 @@ dependencies = [ # Optional
 # This is configuration specific to the `setuptools` build backend.
 # If you are using a different build backend, you will need to change this.
 [tool.setuptools]
-# If there are data files included in your packages that need to be
-# installed, specify them here.
-package-data = {"inelastic_models" = []}
 
 [tool.setuptools.packages.find]
-# All the following settings are optional:
 where = ["src"]
-include = ["inelastic_models"]
-namespaces = false
+include = ["inelastic_models*"]
+namespaces = true
 
 [tool.setuptools.dynamic]
 version = {attr = "inelastic_models.__version__"}
