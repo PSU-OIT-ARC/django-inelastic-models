@@ -1,5 +1,13 @@
 """Declarative Elasticsearch indexes for Django models."""
 
-__version__ = "9.0.0.dev1"
+from importlib.metadata import version, PackageNotFoundError
+
+
+try:
+    __version__ = version("django-inelastic-models")
+except PackageNotFoundError:
+    # package is not installed
+    pass
+
 
 __all__ = ["__version__"]
