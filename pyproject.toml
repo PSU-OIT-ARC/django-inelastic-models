@@ -31,7 +31,7 @@ classifiers = [
 dependencies = [
   "python-dateutil >=2.8.0, <3.0",
   "elasticsearch ~= 9.4.0",
-  "django >=4.2, <6.0"
+  "django >=5.2, <6.0"
 ]
 
 # List additional groups of dependencies here (e.g. development
