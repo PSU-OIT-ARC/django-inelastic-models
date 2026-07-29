@@ -1,11 +1,8 @@
-from django_dynamic_fixture import G
-from django.db import transaction
 from django import test
 
-from inelastic_models.models.test import Model, TEST_MODEL_EXCLUDE_NAME
 from inelastic_models.receivers import get_search_models, suspended_updates
-
-from .base import SearchBaseTestCase
+from tests.models import Model, TEST_MODEL_EXCLUDE_NAME
+from tests.base import SearchBaseTestCase
 
 
 class SearchPostSaveTestCase(SearchBaseTestCase, test.TestCase):

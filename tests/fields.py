@@ -4,8 +4,8 @@ import elasticsearch.exceptions
 from django_dynamic_fixture import G
 from django import test
 
-from inelastic_models.models.test import Model, SearchFieldModel
-from inelastic_models.tests.base import SearchBaseTestCase
+from tests.models import Model, SearchFieldModel
+from tests.base import SearchBaseTestCase
 
 
 class SearchFieldTestCase(SearchBaseTestCase, test.TestCase):

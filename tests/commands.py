@@ -6,9 +6,9 @@ from django_dynamic_fixture import G
 from django.core.management import call_command
 from django import test
 
-from inelastic_models.models.test import Model, ModelSearch
 from inelastic_models.receivers import suspended_updates
-from .base import SearchBaseTestCase
+from tests.models import Model, ModelSearch
+from tests.base import SearchBaseTestCase
 
 logger = logging.getLogger(__name__)
 
