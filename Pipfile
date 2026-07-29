@@ -5,8 +5,8 @@ name = "pypi"
 
 [packages]
 python-dateutil = "~=2.9.0"
-elasticsearch = "~=9.2.0"
-django = { version = ">=4.2,<6.0" }
+elasticsearch = "~=9.4.0"
+django = { version = ">=5.2,<6.0" }
 
 [dev-packages]
 build = "~=1.3.0"
